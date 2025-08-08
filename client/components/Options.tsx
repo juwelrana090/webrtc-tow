@@ -96,7 +96,7 @@ const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {callAccepted && !callEnded ? (
               <button
                 className="w-full mt-2 p-2 bg-red-500 text-white rounded flex items-center cursor-pointer"
-                onClick={leaveCall}
+                onClick={() => leaveCall(idToCall ?? me ?? "")}
               >
                 <PhoneDisabled />
                 <span className="ml-2">Hang Up</span>

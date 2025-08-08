@@ -24,7 +24,7 @@ interface ISocketContext {
   me: string | null;
   answerCall: () => void;
   callUser: (userId: string) => void;
-  leaveCall: () => void;
+  leaveCall: (userId: string) => void;
   isVideo: boolean;
   setIsVideo: React.Dispatch<React.SetStateAction<boolean>>;
   isAudio: boolean;
@@ -132,9 +132,29 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     });
 
+    socket.on("leaveCall", () => {
+      // same cleanup on their side, e.g.:
+      setCall(null);
+      setCallEnded(true);
+      setCallAccepted(false);
+
+      if (userVideo.current && userVideo.current.srcObject) {
+        (userVideo.current.srcObject as MediaStream)
+          .getTracks()
+          .forEach((track) => track.stop());
+        userVideo.current.srcObject = null;
+      }
+
+      if (connectionRef.current) {
+        connectionRef.current.destroy();
+        connectionRef.current = null;
+      }
+    });
+
     return () => {
       socket.off("me");
       socket.off("callUser");
+      socket.off("leaveCall");
     };
   }, []);
 
@@ -200,21 +220,31 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     connectionRef.current = peer;
   };
 
-  const leaveCall = () => {
+  const leaveCall = (userId: string) => {
     setCallEnded(true);
     setCall(null);
     setCallAccepted(false);
 
+    socket.emit("leaveCall", { to: userId });
+
+    // Stop remote video tracks safely
+    if (userVideo.current && userVideo.current.srcObject) {
+      const remoteStream = userVideo.current.srcObject as MediaStream;
+      remoteStream.getTracks().forEach((track) => track.stop());
+      userVideo.current.srcObject = null;
+    }
+
+    // Stop local stream if you want to free camera/mic
+    // if (stream) {
+    //   stream.getTracks().forEach((track) => track.stop());
+    //   setStream(null);
+    // }
+
+    // Destroy the peer connection
     if (connectionRef.current) {
       connectionRef.current.destroy();
       connectionRef.current = null;
     }
-
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-    }
-
-    window.location.reload(); // Optional
   };
 
   // Toggle Video
