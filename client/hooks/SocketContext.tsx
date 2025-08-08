@@ -112,8 +112,6 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
   const answerCall = () => {
     if (!call) return;
 
-    setCallAccepted(true);
-
     const peer = new Peer({
       initiator: false,
       trickle: false,
@@ -133,6 +131,8 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
 
     peer.signal(call.signal);
     connectionRef.current = peer;
+
+    setCallAccepted(true);
   };
 
   const callUser = (userId: string) => {
