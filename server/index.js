@@ -1,47 +1,55 @@
-const app = require("express")();
-const server = require("http").createServer(app);
+const express = require("express");
+const http = require("http");
 const cors = require("cors");
+const { Server } = require("socket.io");
 
-const io = require("socket.io")(server, {
+const app = express();
+const server = http.createServer(app);
+
+// Middleware
+app.use(cors());
+
+// Socket.io setup with CORS
+const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: "*", // Replace with your frontend URL in production
         methods: ["GET", "POST"],
     },
 });
 
-app.use(cors());
-
-
-const PORT = process.env.PORT || 5000;
-
+// Default route
 app.get("/", (req, res) => {
-    res.send("Server is running");
+    res.send("Socket.IO WebRTC Signaling Server is running");
 });
 
+// Socket.IO connection
+io.on("connection", (socket) => {
+    console.log("🔌 A user connected:", socket.id);
 
-io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id);
+    // Emit current socket ID to the client
+    socket.emit("me", socket.id);
 
-    socket.emit('me', socket.id);
-
-    socket.on('disconnect', () => {
-        socket.broadcast.emit('callEnded');
-        console.log('User disconnected:', socket.id);
+    // Handle call initiation
+    socket.on("callUser", ({ userToCall, signalData, from, name }) => {
+        console.log(`📞 ${from} is calling ${userToCall}`);
+        io.to(userToCall).emit("callUser", { signal: signalData, from, name });
     });
 
-    socket.on('callUser', ({ userToCall, signalData, from, name }) => {
-        console.log('Call user:', userToCall);
-        io.to(userToCall).emit('callUser', { signal: signalData, from, name });
+    // Handle call answer
+    socket.on("answerCall", ({ to, signal }) => {
+        console.log(`✅ Call answered by ${socket.id} to ${to}`);
+        io.to(to).emit("callAccepted", signal);
     });
 
-    socket.on('answerCall', (data) => {
-        console.log('Answer call:', data);
-        io.to(data.to).emit('callAccepted', data.signal);
+    // Handle call disconnect
+    socket.on("disconnect", () => {
+        console.log("❌ User disconnected:", socket.id);
+        socket.broadcast.emit("callEnded");
     });
-
-
 });
 
+// Server listen
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`🚀 Server is running on port ${PORT}`);
 });

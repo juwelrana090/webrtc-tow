@@ -28,10 +28,10 @@ const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   } = socketContext;
 
   return (
-    <div className="w-full bg-gray-100 p-4">
-      <div className="w-full">
+    <div className="w-full">
+      <div className="w-full mt-2 px-4 py-2 flex items-center justify-center gap-4 flex-wrap">
         <form
-          className="w-full flex justify-between gap-2"
+          className="container mx-auto bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-3 grid grid-cols-1 lg:grid-cols-2 gap-4"
           noValidate
           autoComplete="off"
         >
@@ -50,11 +50,11 @@ const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <CopyToClipboard text={me ?? ""}>
-              <button className="mt-2 p-2 bg-blue-500 text-white rounded flex items-center cursor-pointer">
+            <CopyToClipboard text={me ?? ""} onCopy={() => alert("ID copied!")}>
+              <span className="w-full mt-2 px-4 py-1.5 bg-blue-500 text-white rounded flex items-center cursor-pointer gap-4">
                 <Assignment />
                 <span className="ml-2">Copy ID</span>
-              </button>
+              </span>
             </CopyToClipboard>
           </div>
           <div className="w-full">
@@ -73,21 +73,25 @@ const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               onChange={(e) => setIdToCall(e.target.value)}
             />
             {callAccepted && !callEnded ? (
-              <button className="mt-2 p-2 bg-red-500 text-white rounded flex items-center cursor-pointer">
+              <button
+                className="w-full mt-2 p-2 bg-red-500 text-white rounded flex items-center cursor-pointer"
+                onClick={leaveCall}
+              >
                 <PhoneDisabled />
                 <span className="ml-2">Hang Up</span>
               </button>
             ) : (
-              <button className="mt-2 p-2 bg-blue-500 text-white rounded flex items-center cursor-pointer">
+              <span
+                className="w-full mt-2 px-4 py-1.5 bg-green-500 text-white rounded flex items-center cursor-pointer gap-4"
+                onClick={() => callUser(idToCall)}
+              >
                 <Phone />
                 <span className="ml-2">Call</span>
-              </button>
+              </span>
             )}
           </div>
-          <div className="w-full"></div>
         </form>
       </div>
-      <div className="w-full "></div>
       <div className="w-full flex items-center justify-center">{children}</div>
     </div>
   );

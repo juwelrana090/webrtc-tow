@@ -4,7 +4,7 @@ import React, { createContext, useState, useRef, useEffect } from "react";
 import { io, Socket } from "socket.io-client";
 import Peer from "simple-peer";
 
-// Type definitions
+// ==================== Types ====================
 interface CallInfo {
   isReceivingCall: boolean;
   from: string;
@@ -27,29 +27,51 @@ interface ISocketContext {
   leaveCall: () => void;
 }
 
-// Create context
+// ==================== Context ====================
 const SocketContext = createContext<ISocketContext | null>(null);
 
-// Create socket instance
+// ==================== Socket ====================
 const socket: Socket = io(
   process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000"
 );
 
-// Context Provider
+const configuration = {
+  iceServers: [
+    {
+      urls: "stun:stun.l.google.com:19302",
+    },
+    {
+      urls: "stun:stun1.l.google.com:19302",
+    },
+    {
+      urls: "stun:stun2.l.google.com:19302",
+    },
+    {
+      urls: "stun:stun3.l.google.com:19302",
+    },
+    {
+      urls: "stun:stun4.l.google.com:19302",
+    },
+    // Add TURN servers here if needed (paid)
+  ],
+};
+
+// ==================== Provider ====================
 const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [me, setMe] = useState<string | null>(null);
   const [call, setCall] = useState<CallInfo | null>(null);
-  const [callAccepted, setCallAccepted] = useState<boolean>(false);
-  const [callEnded, setCallEnded] = useState<boolean>(false);
-  const [name, setName] = useState<string>("");
+  const [callAccepted, setCallAccepted] = useState(false);
+  const [callEnded, setCallEnded] = useState(false);
+  const [name, setName] = useState("");
 
-  const myVideo = useRef<HTMLVideoElement | null>(null);
-  const userVideo = useRef<HTMLVideoElement | null>(null);
+  const myVideo = useRef<HTMLVideoElement>(null);
+  const userVideo = useRef<HTMLVideoElement>(null);
   const connectionRef = useRef<Peer.Instance | null>(null);
 
+  // Get camera & mic stream
   useEffect(() => {
     const getMedia = async () => {
       try {
@@ -58,23 +80,25 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
           audio: true,
         });
         setStream(currentStream);
+
         if (myVideo.current) {
           myVideo.current.srcObject = currentStream;
         }
-      } catch (err) {
-        console.error("Failed to get user media:", err);
+      } catch (error) {
+        console.error("Error accessing media devices:", error);
       }
     };
 
     getMedia();
 
+    // Socket listeners
     socket.on("me", (id: string) => setMe(id));
 
-    socket.on("callUser", ({ from, name: callerName, signal }) => {
+    socket.on("callUser", ({ from, name, signal }) => {
       setCall({
         isReceivingCall: true,
         from,
-        name: callerName,
+        name,
         signal,
       });
     });
@@ -94,6 +118,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
       initiator: false,
       trickle: false,
       stream: stream || undefined,
+      config: configuration,
     });
 
     peer.on("signal", (data) => {
@@ -107,15 +132,20 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     peer.signal(call.signal);
-
     connectionRef.current = peer;
   };
 
   const callUser = (userId: string) => {
+    console.log("Calling user:", userId);
     const peer = new Peer({
       initiator: true,
       trickle: false,
       stream: stream || undefined,
+      config: {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" }, // STUN server
+        ],
+      },
     });
 
     peer.on("signal", (data) => {
@@ -151,7 +181,11 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
       connectionRef.current = null;
     }
 
-    window.location.reload(); // Optional: can replace with state reset instead
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+
+    window.location.reload(); // Optional
   };
 
   return (

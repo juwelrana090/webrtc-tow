@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import { SocketContext } from "@/hooks/SocketContext";
 
 const VideoPlayer = () => {
@@ -10,55 +10,43 @@ const VideoPlayer = () => {
     return <div>Socket context not available.</div>;
   }
 
-  const {
-    call,
-    callAccepted,
-    myVideo,
-    userVideo,
-    stream,
-    name,
-    setName,
-    callEnded,
-    me,
-    answerCall,
-    callUser,
-    leaveCall,
-  } = socketContext;
+  const { call, callAccepted, myVideo, userVideo, stream, name, callEnded } =
+    socketContext;
+
+  // ✅ Attach stream to video when it's available
+  useEffect(() => {
+    if (myVideo.current && stream) {
+      myVideo.current.srcObject = stream;
+    }
+  }, [stream, myVideo]);
 
   return (
-    <div className="w-full mt-2 px-4 py-2 flex items-center justify-center gap-2">
+    <div className="container mx-auto mt-2 px-4 py-2  flex flex-col lg:flex-col-reverse items-center justify-center gap-4 flex-wrap">
       {/* My Video */}
-      {stream && (
-        <div className="flex flex-col items-center justify-center p-3 bg-white border-2 border-dashed border-gray-300 rounded-lg">
-          <div className="w-full">
-            <h3 className="text-lg text-black font-semibold">
-              {name || "Name"}
-            </h3>
-          </div>
-          <video
-            ref={myVideo}
-            className="min-w-[300px] max-w-[550px] h-full mt-2"
-            autoPlay
-            playsInline
-            muted
-          />
-        </div>
-      )}
+      <div className="flex flex-col items-center justify-center p-3 bg-white border-2 border-dashed border-gray-300 rounded-lg">
+        <h3 className="text-lg text-black font-semibold mb-2">
+          {name || "Me"}
+        </h3>
+        <video
+          ref={myVideo}
+          muted
+          autoPlay
+          playsInline
+          className="min-w-[300px] max-w-[550px] h-auto rounded"
+        />
+      </div>
 
-      {/* user Video */}
+      {/* User Video */}
       {callAccepted && !callEnded && (
         <div className="flex flex-col items-center justify-center p-3 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg">
-          <div className="w-full">
-            <h3 className="text-lg text-black font-semibold">
-              {call?.name || "Name"}
-            </h3>
-          </div>
+          <h3 className="text-lg text-black font-semibold mb-2">
+            {call?.name || "Caller"}
+          </h3>
           <video
             ref={userVideo}
-            className="min-w-[300px] max-w-[550px] h-full mt-2"
             autoPlay
             playsInline
-            muted
+            className="min-w-[300px] max-w-[550px] h-auto rounded"
           />
         </div>
       )}
