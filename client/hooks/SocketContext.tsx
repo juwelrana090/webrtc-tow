@@ -52,7 +52,21 @@ const configuration = {
     {
       urls: "stun:stun4.l.google.com:19302",
     },
-    // Add TURN servers here if needed (paid)
+    { urls: "stun:23.21.150.121" },
+    { urls: "stun:stun01.sipphone.com" },
+    { urls: "stun:stun.ekiga.net" },
+    { urls: "stun:stun.fwdnet.net" },
+    { urls: "stun:stun.ideasip.com" },
+    { urls: "stun:stun.iptel.org" },
+    { urls: "stun:stun.rixtelecom.se" },
+    { urls: "stun:stun.schlund.de" },
+    { urls: "stun:stunserver.org" },
+    { urls: "stun:stun.softjoys.com" },
+    { urls: "stun:stun.voiparound.com" },
+    { urls: "stun:stun.voipbuster.com" },
+    { urls: "stun:stun.voipstunt.com" },
+    { urls: "stun:stun.voxgratia.org" },
+    { urls: "stun:stun.xten.com" },
   ],
 };
 
@@ -70,6 +84,11 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
   const myVideo = useRef<HTMLVideoElement>(null);
   const userVideo = useRef<HTMLVideoElement>(null);
   const connectionRef = useRef<Peer.Instance | null>(null);
+
+  // Attach immediately, outside useEffect
+  socket.on("connect", () => {
+    console.log("Connected to socket:", socket.id);
+  });
 
   // Get camera & mic stream
   useEffect(() => {
@@ -91,8 +110,10 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
 
     getMedia();
 
-    // Socket listeners
-    socket.on("me", (id: string) => setMe(id));
+    socket.on("me", (id: string) => {
+      console.log("Got socket ID:", id);
+      setMe(id); // you might need useState callback form here
+    });
 
     socket.on("callUser", ({ from, name, signal }) => {
       setCall({
@@ -152,7 +173,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
       socket.emit("callUser", {
         userToCall: userId,
         signalData: data,
-        from: me,
+        from: socket.id || me,
         name,
       });
     });
@@ -188,6 +209,9 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     window.location.reload(); // Optional
   };
 
+  console.log("socket.id:", socket.id);
+  console.log("socket.id me:", me);
+
   return (
     <SocketContext.Provider
       value={{
@@ -199,7 +223,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
         name,
         setName,
         callEnded,
-        me,
+        me: socket.id || me,
         answerCall,
         callUser,
         leaveCall,

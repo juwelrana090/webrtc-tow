@@ -50,7 +50,7 @@ const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <CopyToClipboard text={me ?? ""} onCopy={() => alert("ID copied!")}>
+            <CopyToClipboard text={me ?? ""}>
               <span className="w-full mt-2 px-4 py-1.5 bg-blue-500 text-white rounded flex items-center cursor-pointer gap-4">
                 <Assignment />
                 <span className="ml-2">Copy ID</span>

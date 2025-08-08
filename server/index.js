@@ -42,6 +42,11 @@ io.on('connection', (socket) => {
         io.to(data.to).emit('callAccepted', data.signal);
     });
 
+    socket.on("callEnded", (to) => {
+        console.log("Call ended");
+        io.to(to).emit('callEnded');
+    });
+
 
 });
 
