@@ -25,6 +25,12 @@ interface ISocketContext {
   answerCall: () => void;
   callUser: (userId: string) => void;
   leaveCall: () => void;
+  isVideo: boolean;
+  setIsVideo: React.Dispatch<React.SetStateAction<boolean>>;
+  isAudio: boolean;
+  setIsAudio: React.Dispatch<React.SetStateAction<boolean>>;
+  toggleVideo: () => void;
+  toggleAudio: () => void;
 }
 
 // ==================== Context ====================
@@ -80,6 +86,8 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
   const [callAccepted, setCallAccepted] = useState(false);
   const [callEnded, setCallEnded] = useState(false);
   const [name, setName] = useState("");
+  const [isVideo, setIsVideo] = useState(true);
+  const [isAudio, setIsAudio] = useState(true);
 
   const myVideo = useRef<HTMLVideoElement>(null);
   const userVideo = useRef<HTMLVideoElement>(null);
@@ -95,8 +103,8 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     const getMedia = async () => {
       try {
         const currentStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true,
+          video: isVideo,
+          audio: isAudio,
         });
         setStream(currentStream);
 
@@ -209,6 +217,28 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     window.location.reload(); // Optional
   };
 
+  // Toggle Video
+  const toggleVideo = () => {
+    if (stream) {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsVideo(videoTrack.enabled);
+      }
+    }
+  };
+
+  // Toggle Audio
+  const toggleAudio = () => {
+    if (stream) {
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsAudio(audioTrack.enabled);
+      }
+    }
+  };
+
   console.log("socket.id:", socket.id);
   console.log("socket.id me:", me);
 
@@ -227,6 +257,12 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
         answerCall,
         callUser,
         leaveCall,
+        isVideo,
+        setIsVideo,
+        isAudio,
+        setIsAudio,
+        toggleVideo, // NEW
+        toggleAudio, // NEW
       }}
     >
       {children}

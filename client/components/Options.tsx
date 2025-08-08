@@ -25,10 +25,31 @@ const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     answerCall,
     callUser,
     leaveCall,
+    toggleVideo,
+    toggleAudio,
+    isVideo,
+    isAudio,
   } = socketContext;
 
   return (
     <div className="w-full">
+      <div className="w-full">
+        <button
+          type="button"
+          onClick={toggleVideo}
+          className="w-full mt-2 px-4 py-1.5 bg-blue-500 text-white rounded flex items-center cursor-pointer gap-4"
+        >
+          {isVideo ? "Turn Camera Off" : "Turn Camera On"}
+        </button>
+
+        <button
+          type="button"
+          onClick={toggleAudio}
+          className="w-full mt-2 px-4 py-1.5 bg-red-500 text-white rounded flex items-center cursor-pointer gap-4"
+        >
+          {isAudio ? "Mute Mic" : "Unmute Mic"}
+        </button>
+      </div>
       <div className="w-full mt-2 px-4 py-2 flex items-center justify-center gap-4 flex-wrap">
         <form
           className="container mx-auto bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-3 grid grid-cols-1 lg:grid-cols-2 gap-4"
