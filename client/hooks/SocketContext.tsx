@@ -40,7 +40,7 @@ const SocketContext = createContext<ISocketContext | null>(null);
 
 // ==================== Socket ====================
 const socket: Socket = io(
-  process.env.NEXT_PUBLIC_SOCKET_URL || "https://0275bee4229f.ngrok-free.app "
+  process.env.NEXT_PUBLIC_SOCKET_URL || "https://42c17942b859.ngrok-free.app"
 );
 
 // ==================== Provider ====================
