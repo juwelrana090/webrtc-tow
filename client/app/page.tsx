@@ -2,7 +2,6 @@
 
 import Notifications from "@/components/Notifications";
 import Options from "@/components/Options";
-import VideoPlayer from "@/components/VideoPlayer";
 import { ContextProvider } from "@/hooks/SocketContext";
 
 export default function Home() {
@@ -14,11 +13,6 @@ export default function Home() {
             <h2 className="text-2xl font-bold">Video Chat App</h2>
           </div>
         </div>
-
-        <div className="w-full">
-          <VideoPlayer />
-        </div>
-
         <Options>
           <div className="w-full">
             <Notifications />
