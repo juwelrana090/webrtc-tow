@@ -77,6 +77,8 @@ const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <span className="ml-2">Copy ID</span>
               </span>
             </CopyToClipboard>
+
+            {me ?? ""}
           </div>
           <div className="w-full">
             <label

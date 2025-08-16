@@ -38,7 +38,7 @@ const SocketContext = createContext<ISocketContext | null>(null);
 
 // ==================== Socket ====================
 const socket: Socket = io(
-  process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000"
+  process.env.NEXT_PUBLIC_SOCKET_URL || "https://7f809b8aa36d.ngrok-free.app"
 );
 
 const configuration = {
