@@ -2,9 +2,7 @@
 
 import React, { createContext, useState, useRef, useEffect } from "react";
 import { io, Socket } from "socket.io-client";
-
-// <-- Peer handler
-import { peerHandler } from "./peerHandler";
+import Peer from "simple-peer";
 
 // ==================== Types ====================
 interface CallInfo {
@@ -40,8 +38,43 @@ const SocketContext = createContext<ISocketContext | null>(null);
 
 // ==================== Socket ====================
 const socket: Socket = io(
-  process.env.NEXT_PUBLIC_SOCKET_URL || "https://42c17942b859.ngrok-free.app"
+  process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000"
 );
+
+const configuration = {
+  iceServers: [
+    {
+      urls: "stun:stun.l.google.com:19302",
+    },
+    {
+      urls: "stun:stun1.l.google.com:19302",
+    },
+    {
+      urls: "stun:stun2.l.google.com:19302",
+    },
+    {
+      urls: "stun:stun3.l.google.com:19302",
+    },
+    {
+      urls: "stun:stun4.l.google.com:19302",
+    },
+    { urls: "stun:23.21.150.121" },
+    { urls: "stun:stun01.sipphone.com" },
+    { urls: "stun:stun.ekiga.net" },
+    { urls: "stun:stun.fwdnet.net" },
+    { urls: "stun:stun.ideasip.com" },
+    { urls: "stun:stun.iptel.org" },
+    { urls: "stun:stun.rixtelecom.se" },
+    { urls: "stun:stun.schlund.de" },
+    { urls: "stun:stunserver.org" },
+    { urls: "stun:stun.softjoys.com" },
+    { urls: "stun:stun.voiparound.com" },
+    { urls: "stun:stun.voipbuster.com" },
+    { urls: "stun:stun.voipstunt.com" },
+    { urls: "stun:stun.voxgratia.org" },
+    { urls: "stun:stun.xten.com" },
+  ],
+};
 
 // ==================== Provider ====================
 const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -58,11 +91,9 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const myVideo = useRef<HTMLVideoElement>(null);
   const userVideo = useRef<HTMLVideoElement>(null);
-  const connectionRef = useRef<ReturnType<
-    typeof peerHandler.createInitiatorPeer
-  > | null>(null);
+  const connectionRef = useRef<Peer.Instance | null>(null);
 
-  // Attach immediately
+  // Attach immediately, outside useEffect
   socket.on("connect", () => {
     console.log("Connected to socket:", socket.id);
   });
@@ -88,7 +119,8 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     getMedia();
 
     socket.on("me", (id: string) => {
-      setMe(id);
+      console.log("Got socket ID:", id);
+      setMe(id); // you might need useState callback form here
     });
 
     socket.on("callUser", ({ from, name, signal }) => {
@@ -101,19 +133,22 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     socket.on("leaveCall", () => {
+      // same cleanup on their side, e.g.:
       setCall(null);
       setCallEnded(true);
       setCallAccepted(false);
 
-      if (userVideo.current?.srcObject) {
+      if (userVideo.current && userVideo.current.srcObject) {
         (userVideo.current.srcObject as MediaStream)
           .getTracks()
           .forEach((track) => track.stop());
         userVideo.current.srcObject = null;
       }
 
-      peerHandler.destroyPeer(connectionRef.current);
-      connectionRef.current = null;
+      if (connectionRef.current) {
+        connectionRef.current.destroy();
+        connectionRef.current = null;
+      }
     });
 
     return () => {
@@ -123,46 +158,59 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  // ==================== Call Actions ====================
   const answerCall = () => {
-    if (!call || !stream) return;
+    if (!call) return;
 
-    const peer = peerHandler.createReceiverPeer(
-      stream,
-      call.signal,
-      (signalData) => {
-        socket.emit("answerCall", { signal: signalData, to: call.from });
-      },
-      (remoteStream) => {
-        if (userVideo.current) {
-          userVideo.current.srcObject = remoteStream;
-        }
+    const peer = new Peer({
+      initiator: false,
+      trickle: false,
+      stream: stream || undefined,
+      config: configuration,
+    });
+
+    peer.on("signal", (data) => {
+      socket.emit("answerCall", { signal: data, to: call.from });
+    });
+
+    peer.on("stream", (currentStream: MediaStream) => {
+      if (userVideo.current) {
+        userVideo.current.srcObject = currentStream;
       }
-    );
+    });
 
+    peer.signal(call.signal);
     connectionRef.current = peer;
+
     setCallAccepted(true);
   };
 
   const callUser = (userId: string) => {
-    if (!stream) return;
-
-    const peer = peerHandler.createInitiatorPeer(
-      stream,
-      (signalData) => {
-        socket.emit("callUser", {
-          userToCall: userId,
-          signalData,
-          from: socket.id || me,
-          name,
-        });
+    console.log("Calling user:", userId);
+    const peer = new Peer({
+      initiator: true,
+      trickle: false,
+      stream: stream || undefined,
+      config: {
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" }, // STUN server
+        ],
       },
-      (remoteStream) => {
-        if (userVideo.current) {
-          userVideo.current.srcObject = remoteStream;
-        }
+    });
+
+    peer.on("signal", (data) => {
+      socket.emit("callUser", {
+        userToCall: userId,
+        signalData: data,
+        from: socket.id || me,
+        name,
+      });
+    });
+
+    peer.on("stream", (currentStream: MediaStream) => {
+      if (userVideo.current) {
+        userVideo.current.srcObject = currentStream;
       }
-    );
+    });
 
     socket.on("callAccepted", (signal) => {
       setCallAccepted(true);
@@ -176,20 +224,30 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     setCallEnded(true);
     setCall(null);
     setCallAccepted(false);
+
     socket.emit("leaveCall", { to: userId });
 
-    if (userVideo.current?.srcObject) {
-      (userVideo.current.srcObject as MediaStream)
-        .getTracks()
-        .forEach((t) => t.stop());
+    // Stop remote video tracks safely
+    if (userVideo.current && userVideo.current.srcObject) {
+      const remoteStream = userVideo.current.srcObject as MediaStream;
+      remoteStream.getTracks().forEach((track) => track.stop());
       userVideo.current.srcObject = null;
     }
 
-    peerHandler.destroyPeer(connectionRef.current);
-    connectionRef.current = null;
+    // Stop local stream if you want to free camera/mic
+    // if (stream) {
+    //   stream.getTracks().forEach((track) => track.stop());
+    //   setStream(null);
+    // }
+
+    // Destroy the peer connection
+    if (connectionRef.current) {
+      connectionRef.current.destroy();
+      connectionRef.current = null;
+    }
   };
 
-  // ==================== Media Toggles ====================
+  // Toggle Video
   const toggleVideo = () => {
     if (stream) {
       const videoTrack = stream.getVideoTracks()[0];
@@ -200,6 +258,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Toggle Audio
   const toggleAudio = () => {
     if (stream) {
       const audioTrack = stream.getAudioTracks()[0];
@@ -209,6 +268,9 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     }
   };
+
+  console.log("socket.id:", socket.id);
+  console.log("socket.id me:", me);
 
   return (
     <SocketContext.Provider
@@ -229,8 +291,8 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsVideo,
         isAudio,
         setIsAudio,
-        toggleVideo,
-        toggleAudio,
+        toggleVideo, // NEW
+        toggleAudio, // NEW
       }}
     >
       {children}
