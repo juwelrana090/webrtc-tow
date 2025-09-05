@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 
 // <-- Peer handler
 import { peerHandler } from "./peerHandler";
+import { API_URL } from "@/config";
 
 // ==================== Types ====================
 interface CallInfo {
@@ -24,7 +25,11 @@ interface ISocketContext {
   setName: React.Dispatch<React.SetStateAction<string>>;
   callEnded: boolean;
   me: string | null;
+  users: { name: string; userId: string }[];
+  idToCall: string;
+  setIdToCall: React.Dispatch<React.SetStateAction<string>>;
   answerCall: () => void;
+  nextChat: (name: string, userId: string) => void;
   callUser: (userId: string) => void;
   leaveCall: (userId: string) => void;
   isVideo: boolean;
@@ -39,9 +44,9 @@ interface ISocketContext {
 const SocketContext = createContext<ISocketContext | null>(null);
 
 // ==================== Socket ====================
-const socket: Socket = io(
-  process.env.NEXT_PUBLIC_SOCKET_URL || "https://42c17942b859.ngrok-free.app"
-);
+const socket: Socket = io(API_URL, {
+  transports: ["websocket"],
+});
 
 // ==================== Provider ====================
 const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -55,6 +60,9 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
   const [name, setName] = useState("");
   const [isVideo, setIsVideo] = useState(true);
   const [isAudio, setIsAudio] = useState(true);
+  const [users, setUsers] = useState<{ name: string; userId: string }[]>([]);
+
+  const [idToCall, setIdToCall] = useState("");
 
   const myVideo = useRef<HTMLVideoElement>(null);
   const userVideo = useRef<HTMLVideoElement>(null);
@@ -87,8 +95,19 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
 
     getMedia();
 
+    if (users.length < 0) {
+      socket.emit("getUsers");
+      console.log("No users available");
+    }
+
     socket.on("me", (id: string) => {
       setMe(id);
+      console.log("My socket ID:", id);
+    });
+
+    socket.on("userList", (users: { name: string; userId: string }[]) => {
+      setUsers(users);
+      console.log("User list updated:", users);
     });
 
     socket.on("callUser", ({ from, name, signal }) => {
@@ -118,6 +137,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
 
     return () => {
       socket.off("me");
+      socket.off("userList");
       socket.off("callUser");
       socket.off("leaveCall");
     };
@@ -142,6 +162,10 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
 
     connectionRef.current = peer;
     setCallAccepted(true);
+  };
+
+  const nextChat = (name: string, userId: string) => {
+    socket.emit("registerUser", { name, userId });
   };
 
   const callUser = (userId: string) => {
@@ -222,7 +246,11 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({
         setName,
         callEnded,
         me: socket.id || me,
+        users,
+        idToCall,
+        setIdToCall,
         answerCall,
+        nextChat,
         callUser,
         leaveCall,
         isVideo,

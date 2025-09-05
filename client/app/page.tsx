@@ -1,8 +1,8 @@
 "use client";
 
-import Notifications from "@/components/Notifications";
-import Options from "@/components/Options";
+import React from "react";
 import { ContextProvider } from "@/hooks/SocketContext";
+import AddUser from "@/components/AddUser";
 
 export default function Home() {
   return (
@@ -10,14 +10,13 @@ export default function Home() {
       <main className="w-full h-screen text-black dark:text-white flex flex-col items-center">
         <div className="w-full flex items-center justify-center mt-4">
           <div className="w-[300px] bg-gray-700 rounded p-4 text-center">
-            <h2 className="text-2xl font-bold">Video Chat App</h2>
+            <h2 className="text-2xl font-bold">QuickChat</h2>
           </div>
         </div>
-        <Options>
-          <div className="w-full">
-            <Notifications />
-          </div>
-        </Options>
+
+        <div className="w-full flex items-center justify-center mt-4">
+          <AddUser />
+        </div>
       </main>
     </ContextProvider>
   );

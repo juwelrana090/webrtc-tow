@@ -16,7 +16,6 @@ import { SocketContext } from "@/hooks/SocketContext";
 
 const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const socketContext = useContext(SocketContext);
-  const [idToCall, setIdToCall] = useState("");
 
   if (!socketContext) {
     return <div>Socket context not available.</div>;
@@ -32,6 +31,7 @@ const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setName,
     callEnded,
     me,
+    idToCall,
     answerCall,
     callUser,
     leaveCall,
@@ -74,55 +74,6 @@ const Options: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
           </div>
 
-          <div className="w-full mt-2 px-4 py-2 flex items-center justify-center gap-4 flex-wrap">
-            <form
-              className="w-full  p-3 grid grid-cols-1 gap-4"
-              noValidate
-              autoComplete="off"
-            >
-              <div className="w-full flex justify-start gap-2">
-                <label
-                  className="w-full mb-2 text-black text-[32px] font-medium"
-                  htmlFor="name"
-                >
-                  Account Info :
-                </label>
-                <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-2">
-                  <TextField
-                    className="w-full"
-                    id="name"
-                    label="Name"
-                    variant="outlined"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                  <CopyToClipboard text={me ?? ""}>
-                    <span className="w-[100px] px-4 py-3 bg-blue-500 text-white rounded flex justify-center items-center cursor-pointer gap-4">
-                      <Assignment />
-                    </span>
-                  </CopyToClipboard>
-                </div>
-              </div>
-              <div className="w-full flex justify-start gap-2">
-                <label
-                  className="w-full mb-2 text-black text-[32px] font-medium"
-                  htmlFor="idToCall"
-                >
-                  Make a Call
-                </label>
-                <div className="w-full">
-                  <TextField
-                    className="w-full"
-                    id="idToCall"
-                    label="ID to call"
-                    variant="outlined"
-                    value={idToCall}
-                    onChange={(e) => setIdToCall(e.target.value)}
-                  />
-                </div>
-              </div>
-            </form>
-          </div>
           <div className="flex w-full items-center justify-between px-0.5 py-4">
             <ul className="flex justify-start gap-2">
               <li>
