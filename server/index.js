@@ -24,6 +24,16 @@ let users = [];
 /**
  * REST Endpoints
  */
+
+// Health check
+app.get("/", (req, res) => {
+  res.status(200).send({
+    status: "success",
+    message: "Server is running",
+  });
+});
+
+// Get all users
 app.get("/get", (req, res) => {
   res.status(200).send({
     status: "success",
