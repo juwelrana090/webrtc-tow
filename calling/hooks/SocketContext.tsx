@@ -30,8 +30,6 @@ interface ISocketContext {
   remoteStream: SimpleMediaStream | null;
   name: string;
   setName: React.Dispatch<React.SetStateAction<string>>;
-  user: { name: string; userId: string };
-  setUser: React.Dispatch<React.SetStateAction<{ name: string; userId: string }>>;
   callEnded: boolean;
   me: string | null;
   users: { name: string; userId: string }[];
@@ -71,7 +69,6 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const [callAccepted, setCallAccepted] = useState(false);
   const [callEnded, setCallEnded] = useState(false);
   const [name, setName] = useState('');
-  const [user, setUser] = useState<{ name: string; userId: string }>({ name: '', userId: '' });
   const [isVideo, setIsVideo] = useState(true);
   const [isAudio, setIsAudio] = useState(true);
   const [isFrontCamera, setIsFrontCamera] = useState(true);
@@ -261,8 +258,6 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         remoteStream,
         name,
         setName,
-        user,
-        setUser,
         callEnded,
         me: socket.id || me,
         users,

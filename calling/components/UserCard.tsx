@@ -2,26 +2,16 @@ import { useRouter } from 'expo-router';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import { useSocket } from '@/hooks/useSocket';
-import { useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const UserCard = ({ name, socketId, userId }: UserProps) => {
-  const { idToCall, user, setUser } = useSocket();
+  const { idToCall } = useSocket();
   const router = useRouter();
 
-  const handleSelect = () => {
-    const selectedUser = { name, userId };
-    setUser(selectedUser);
-
-    // ✅ Use selectedUser directly instead of waiting for state
-    // router.push(`/chats/${userId}`);
+  const handleSelect = async () => {
+    await AsyncStorage.setItem('chatUser', JSON.stringify({ name, userId }));
+    router.push(`/chats/${userId}`);
   };
-
-  useEffect(() => {
-    if (user) {
-      router.push(`/chats/${user.userId}`);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
 
   return (
     <TouchableOpacity
