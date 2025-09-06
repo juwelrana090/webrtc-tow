@@ -2,6 +2,7 @@ import { useSocket } from '@/hooks/useSocket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, Text, View } from 'react-native';
+import VideoPlayer from './VideoPlayer';
 
 interface Props {
   id: string;
@@ -48,6 +49,9 @@ const UserChatsDetails = ({ id, router }: Props) => {
         <View className="ml-2 ">
           <Text className="text-sm font-semibold">{user?.name}</Text>
         </View>
+      </View>
+      <View className='flex w-full items-center justify-center'>
+        <VideoPlayer />
       </View>
     </View>
   );

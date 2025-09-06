@@ -4,13 +4,19 @@
     "slug": "calling",
     "version": "1.0.0",
     "orientation": "portrait",
+    "sdkVersion": "53.0.0",
+    "platforms": ["ios", "android"],
     "icon": "./assets/images/logo.png",
     "scheme": "calling",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.webrtcbarc.calling"
+      "bundleIdentifier": "com.webrtcbarc.calling",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs access to the camera for video calls",
+        "NSMicrophoneUsageDescription": "This app needs access to the microphone for calls"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +24,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.webrtcbarc.calling"
+      "package": "com.webrtcbarc.calling",
+      "permissions": ["CAMERA", "RECORD_AUDIO"]
     },
     "web": {
       "bundler": "metro",
@@ -34,6 +41,12 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "react-native-permissions",
+        {
+          "permissions": ["CAMERA", "MICROPHONE"]
         }
       ]
     ],
