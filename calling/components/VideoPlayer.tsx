@@ -1,7 +1,7 @@
 import { useSocket } from '@/hooks/useSocket';
-import { Camera } from 'expo-camera';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useRef } from 'react';
+import { Text, View } from 'react-native';
+import { RTCView } from 'react-native-webrtc';
 
 const VideoPlayer = () => {
   const {
@@ -15,61 +15,67 @@ const VideoPlayer = () => {
     hasCameraPermission,
   } = useSocket();
 
+  const localVideoRef = useRef<any>(null);
+
   if (!hasCameraPermission) {
     return (
-      <View style={styles.container}>
-        <View style={styles.permissionContainer}>
-          <Text style={styles.permissionText}>Camera permission is required for video calls</Text>
-        </View>
+      <View className="flex-1 items-center justify-center bg-black px-5">
+        <Text className="text-center text-lg text-white">
+          Camera permission is required for video calls
+        </Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.videoContainer}>
-        {/* Local video (your camera) - Using Expo Camera */}
-        {isVideo && localStream && (
-          <Camera
-            style={styles.localVideo}
-            type={isFrontCamera ? CameraType.front : CameraType.back}
+    <View className="flex-1 items-center justify-center bg-black px-4 py-8">
+      <View className="relative aspect-video w-full max-w-[400px] flex-1 overflow-hidden rounded-xl bg-gray-800">
+        {/* Local Video */}
+        {localStream && isVideo ? (
+          <RTCView
+            ref={localVideoRef}
+            //@ts-ignore
+            streamURL={localStream.toURL()}
+            className="h-full w-full"
+            objectFit="cover"
+          />
+        ) : (
+          <View className="flex h-full w-full items-center justify-center bg-gray-700">
+            <Text className="text-lg font-semibold text-white">Video Off</Text>
+          </View>
+        )}
+
+        {/* Remote Video */}
+        {callAccepted && !callEnded && remoteStream && (
+          <RTCView
+            //@ts-ignore
+            streamURL={remoteStream.toURL()}
+            className="absolute right-2 top-4 h-[140px] w-[100px] overflow-hidden rounded-md border-2 border-white"
+            objectFit="cover"
           />
         )}
 
-        {/* Local video placeholder when video is off */}
-        {!isVideo && (
-          <View style={styles.videoPlaceholder}>
-            <Text style={styles.placeholderText}>Video Off</Text>
-          </View>
-        )}
-
-        {/* Remote user video placeholder (since WebRTC isn't available in Expo Go) */}
+        {/* Labels */}
+        <Text className="absolute bottom-3 left-3 rounded bg-black/70 px-2 py-1 text-xs font-semibold text-white">
+          You
+        </Text>
         {callAccepted && !callEnded && remoteStream && (
-          <View style={styles.remoteVideoContainer}>
-            <View style={styles.remoteVideoPlaceholder}>
-              <Text style={styles.remoteVideoText}>Remote</Text>
-              <Text style={styles.remoteVideoSubtext}>WebRTC not available in Expo Go</Text>
-            </View>
-            <Text style={styles.remoteLabel}>Remote User</Text>
-          </View>
+          <Text className="absolute bottom-1 left-1 rounded bg-black/70 px-1 py-0.5 text-[10px] font-semibold text-white">
+            Remote User
+          </Text>
         )}
 
-        {/* Local video label */}
-        <Text style={styles.localLabel}>You</Text>
-
-        {/* Call status overlay */}
+        {/* Call Status */}
         {!callAccepted && call && (
-          <View style={styles.callStatusOverlay}>
-            <Text style={styles.callStatusText}>
+          <View className="absolute left-0 right-0 top-1/2 -translate-y-3 items-center bg-black/80 py-3">
+            <Text className="text-base font-semibold text-white">
               {call.isReceivingCall ? `${call.name} is calling...` : 'Calling...'}
             </Text>
           </View>
         )}
-
-        {/* No call active overlay */}
         {!call && !callAccepted && (
-          <View style={styles.callStatusOverlay}>
-            <Text style={styles.callStatusText}>Ready for calls</Text>
+          <View className="absolute left-0 right-0 top-1/2 -translate-y-3 items-center bg-black/80 py-3">
+            <Text className="text-base font-semibold text-white">Ready for calls</Text>
           </View>
         )}
       </View>
@@ -77,119 +83,4 @@ const VideoPlayer = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 32,
-    backgroundColor: '#000',
-  },
-  videoContainer: {
-    position: 'relative',
-    flex: 1,
-    width: '100%',
-    maxWidth: 400,
-    aspectRatio: 16 / 9,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#222',
-  },
-  localVideo: {
-    width: '100%',
-    height: '100%',
-  },
-  videoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  remoteVideoContainer: {
-    position: 'absolute',
-    top: 16,
-    right: 8,
-    width: 100,
-    height: 140,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#444',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  remoteVideoPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#555',
-  },
-  remoteVideoText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  remoteVideoSubtext: {
-    color: '#ccc',
-    fontSize: 8,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  localLabel: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  remoteLabel: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 2,
-  },
-  callStatusOverlay: {
-    position: 'absolute',
-    top: '50%',
-    left: 0,
-    right: 0,
-    transform: [{ translateY: -15 }],
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  callStatusText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  permissionContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  permissionText: {
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-});
+export default VideoPlayer;
