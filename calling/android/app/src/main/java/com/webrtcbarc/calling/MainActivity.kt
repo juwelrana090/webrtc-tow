@@ -1,4 +1,4 @@
-package com.anonymous.calling
+package com.webrtcbarc.calling
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

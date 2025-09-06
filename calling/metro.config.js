@@ -6,6 +6,7 @@ const config = getDefaultConfig(__dirname);
 config.resolver.alias = {
   ...config.resolver.alias,
   'crypto': 'react-native-get-random-values',
+  'socket.io-client': 'socket.io-client/dist/socket.io.js',
 };
 
 config.resolver.assetExts.push(

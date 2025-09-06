@@ -257,7 +257,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.calling";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.webrtcbarc.calling";
 				PRODUCT_NAME = "calling";
 				SWIFT_OBJC_BRIDGING_HEADER = "calling/calling-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -286,7 +286,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.calling";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.webrtcbarc.calling";
 				PRODUCT_NAME = "calling";
 				SWIFT_OBJC_BRIDGING_HEADER = "calling/calling-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

@@ -1,4 +1,4 @@
-package com.anonymous.calling
+package com.webrtcbarc.calling
 
 import android.app.Application
 import android.content.res.Configuration
