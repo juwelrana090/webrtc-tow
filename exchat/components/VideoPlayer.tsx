@@ -16,6 +16,8 @@ const VideoPlayer = () => {
 
   const { call, callAccepted, callEnded, localStream, remoteStream, name } = socketContext;
 
+  console.log('🎥 Rendering VideoPlayer component', remoteStream);
+
   return (
     <View className="flex-1 items-center justify-center bg-gray-900">
       <View className="h-full w-full overflow-hidden">
