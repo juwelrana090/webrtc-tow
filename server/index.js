@@ -8,7 +8,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*", // change to your frontend origin in production
+    origin: "*", // 🔐 Change this to your frontend origin in production
     methods: ["GET", "POST"],
   },
 });
@@ -18,14 +18,14 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
-// Active users
+// Active users list
 let users = [];
 
 /**
  * REST Endpoints
  */
 
-// Health check
+// ✅ Health check
 app.get("/", (req, res) => {
   res.status(200).send({
     status: "success",
@@ -33,7 +33,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// Get all users
+// ✅ Get all users
 app.get("/get", (req, res) => {
   res.status(200).send({
     status: "success",
@@ -46,24 +46,25 @@ app.get("/get", (req, res) => {
  * Socket.IO Events
  */
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
+  console.log("✅ User connected:", socket.id);
 
   // Send socket ID to client
   socket.emit("me", socket.id);
 
   /**
-   * Register user when they join
+   * Register user
    */
   socket.on("registerUser", ({ name, userId }) => {
     if (!userId || !name) return;
 
-    // Remove any old user with the same userId (avoid duplicates)
+    // Remove old user with same ID (prevent duplicates)
     users = users.filter((user) => user.userId !== userId);
 
-    // Add fresh entry
-    users.push({ name, userId, socketId: socket.id });
+    // Add new user
+    const newUser = { name, userId, socketId: socket.id };
+    users.push(newUser);
 
-    console.log("User registered:", { name, userId, socketId: socket.id });
+    console.log("👤 User registered:", newUser);
 
     // Broadcast updated list
     io.emit("userList", users);
@@ -73,7 +74,7 @@ io.on("connection", (socket) => {
    * Request user list
    */
   socket.on("getUsers", () => {
-    console.log("Sending user list to:", socket.id);
+    console.log("📤 Sending user list to:", socket.id);
     socket.emit("userList", users);
   });
 
@@ -81,7 +82,7 @@ io.on("connection", (socket) => {
    * Call user
    */
   socket.on("callUser", ({ userToCall, signalData, from, name }) => {
-    console.log("Call from:", from, "to:", userToCall);
+    console.log(`📞 Call from ${from} → ${userToCall}`);
     io.to(userToCall).emit("callUser", { signal: signalData, from, name });
   });
 
@@ -89,7 +90,7 @@ io.on("connection", (socket) => {
    * Answer call
    */
   socket.on("answerCall", (data) => {
-    console.log("Answer call:", data);
+    console.log("✅ Call answered by:", data.to);
     io.to(data.to).emit("callAccepted", data.signal);
   });
 
@@ -97,15 +98,15 @@ io.on("connection", (socket) => {
    * Leave call
    */
   socket.on("leaveCall", ({ to }) => {
-    console.log("Call ended with:", to);
+    console.log("❌ Call ended with:", to);
     io.to(to).emit("leaveCall");
   });
 
   /**
-   * Handle user disconnect
+   * Handle disconnect
    */
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    console.log("🚪 User disconnected:", socket.id);
 
     // Remove user by socketId
     users = users.filter((user) => user.socketId !== socket.id);
@@ -122,5 +123,5 @@ io.on("connection", (socket) => {
  * Start server
  */
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

@@ -9,21 +9,22 @@ const VideoPlayer = () => {
   if (!socketContext) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-900">
-        <Text className="text-lg text-white">Socket context not available.</Text>
+        <Text className="text-lg text-white">⚠️ Socket context not available.</Text>
       </View>
     );
   }
-  const { call, callAccepted, localStream, remoteStream, stream, name, callEnded } = socketContext;
+
+  const { call, callAccepted, callEnded, localStream, remoteStream, name } = socketContext;
 
   return (
-    <View className="z-10 flex h-full w-full items-center justify-center bg-gray-900 px-0 py-0">
-      <View className="h-full w-full overflow-hidden ">
-        {/* Local Video Stream */}
+    <View className="flex-1 items-center justify-center bg-gray-900">
+      <View className="h-full w-full overflow-hidden">
+        {/* ✅ Local Video */}
         {localStream ? (
           <RTCView
-            streamURL={localStream.toURL()}
+            streamURL={localStream.toURL?.()}
             style={{ width: '100%', height: '100%' }}
-            mirror={true}
+            mirror
             objectFit="cover"
           />
         ) : (
@@ -37,32 +38,33 @@ const VideoPlayer = () => {
           </View>
         )}
 
-        {/* Remote Video Stream (Picture-in-Picture) */}
-        {callAccepted && !callEnded && remoteStream && (
+        {/* ✅ Remote Video (PiP) */}
+        {callAccepted && !callEnded && (
           <View className="absolute right-2 top-2 h-48 w-32 overflow-hidden rounded-lg border-2 border-white bg-gray-700">
-            <RTCView
-              streamURL={remoteStream.toURL()}
-              style={{ width: '100%', height: '100%' }}
-              mirror={true}
-              objectFit="cover"
-            />
+            {remoteStream ? (
+              <RTCView
+                streamURL={remoteStream.toURL?.()}
+                style={{ width: '100%', height: '100%' }}
+                mirror={false}
+                objectFit="cover"
+              />
+            ) : (
+              <View className="flex-1 items-center justify-center bg-gray-800">
+                <View className="animate-pulse">
+                  <View className="mb-2 h-10 w-10 rounded-full bg-blue-500" />
+                  <Text className="text-xs text-white">Connecting...</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Remote User Label */}
             <View className="absolute bottom-2 left-2 rounded bg-black bg-opacity-50 px-2 py-1">
-              <Text className="text-xs text-white">{name || 'Remote User'}</Text>
+              <Text className="text-xs text-white">{call?.name || 'Remote User'}</Text>
             </View>
           </View>
         )}
 
-        {/* Call Status Indicators */}
-        {callAccepted && !callEnded && !remoteStream && (
-          <View className="absolute right-2 top-2 h-48 w-32 items-center justify-center rounded-lg bg-gray-700">
-            <View className="animate-pulse">
-              <View className="mb-2 h-12 w-12 rounded-full bg-blue-500"></View>
-              <Text className="text-center text-xs text-white">Connecting...</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Local Video Label */}
+        {/* ✅ Local User Label */}
         <View className="absolute left-4 top-8 rounded-full bg-black bg-opacity-50 px-3 py-2">
           <Text className="text-sm text-white">You</Text>
         </View>

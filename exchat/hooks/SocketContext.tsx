@@ -1,16 +1,20 @@
 import { API_URL } from '@/config';
 import React, { createContext, useEffect, useRef, useState } from 'react';
-import { Alert, PermissionsAndroid, Platform } from 'react-native';
-import { mediaDevices, MediaStream } from 'react-native-webrtc';
+import { PermissionsAndroid, Platform } from 'react-native';
+import {
+  mediaDevices,
+  MediaStream,
+  RTCPeerConnection,
+  RTCSessionDescription,
+} from 'react-native-webrtc';
 import io from 'socket.io-client';
-import { handleSignal, peerHandler, SignalData } from './peerHandler';
 
 // ==================== Types ====================
 interface CallInfo {
   isReceivingCall: boolean;
   from: string;
   name: string;
-  signal: SignalData;
+  signal: any;
 }
 
 interface ISocketContext {
@@ -23,7 +27,7 @@ interface ISocketContext {
   setName: React.Dispatch<React.SetStateAction<string>>;
   callEnded: boolean;
   me: string | null;
-  users: { name: string; userId: string }[];
+  users: { name: string; userId: string; socketId: string }[];
   idToCall: string;
   setIdToCall: React.Dispatch<React.SetStateAction<string>>;
   answerCall: () => void;
@@ -38,171 +42,154 @@ interface ISocketContext {
   toggleAudio: () => void;
   isFrontCamera: boolean;
   setIsFrontCamera: React.Dispatch<React.SetStateAction<boolean>>;
+  switchCamera: () => void;
 }
 
 // ==================== Context ====================
 const SocketContext = createContext<ISocketContext | null>(null);
 
 // ==================== Socket ====================
-const socket = io(API_URL, {
-  transports: ['websocket'],
-});
+const socket = io(API_URL, { transports: ['websocket'] });
+
+const configuration: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    {
+      urls: 'turn:188.245.189.30:3478',
+      username: 'turnserver',
+      credential: 'dev',
+    },
+    {
+      urls: 'turns:188.245.189.30:5349?transport=tcp',
+      username: 'turnserver',
+      credential: 'dev',
+    },
+  ],
+};
 
 const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+
   const [me, setMe] = useState<string | null>(null);
+  const [users, setUsers] = useState<{ name: string; userId: string; socketId: string }[]>([]);
   const [call, setCall] = useState<CallInfo | null>(null);
   const [callAccepted, setCallAccepted] = useState(false);
   const [callEnded, setCallEnded] = useState(false);
   const [name, setName] = useState('');
+  const [idToCall, setIdToCall] = useState('');
+
   const [isVideo, setIsVideo] = useState(true);
   const [isAudio, setIsAudio] = useState(true);
   const [isFrontCamera, setIsFrontCamera] = useState(true);
-  const [users, setUsers] = useState<{ name: string; userId: string }[]>([]);
-  const [idToCall, setIdToCall] = useState('');
 
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const connectionRef = useRef<any>(null);
-  const [hasPermissions, setHasPermissions] = useState<boolean>(false);
+  const pc = useRef<RTCPeerConnection | null>(null);
 
+  // ==================== Init ====================
   useEffect(() => {
-    const requestPermissions = async (): Promise<boolean> => {
-      if (Platform.OS === 'android') {
-        try {
-          const granted = await PermissionsAndroid.requestMultiple([
-            PermissionsAndroid.PERMISSIONS.CAMERA,
-            PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          ]);
+    const init = async () => {
+      await requestPermissions();
 
-          const permissionsGranted =
-            granted['android.permission.CAMERA'] === PermissionsAndroid.RESULTS.GRANTED &&
-            granted['android.permission.RECORD_AUDIO'] === PermissionsAndroid.RESULTS.GRANTED;
+      createPeerConnection();
 
-          setHasPermissions(permissionsGranted);
-          return permissionsGranted;
-        } catch (error) {
-          console.error('Permission error:', error);
-          setHasPermissions(false);
-          return false;
-        }
-      }
-      setHasPermissions(true);
-      return true;
+      const currentStream = await mediaDevices.getUserMedia({
+        audio: true,
+        video: {
+          facingMode: isFrontCamera ? 'user' : 'environment',
+        },
+      });
+
+      currentStream.getTracks().forEach((track) => {
+        pc.current?.addTrack(track, currentStream);
+      });
+
+      setStream(currentStream);
+      setLocalStream(currentStream);
     };
 
-    const getMedia = async () => {
-      if (!hasPermissions) {
-        const permissionsGranted = await requestPermissions();
-        if (!permissionsGranted) {
-          Alert.alert(
-            'Permissions required',
-            'Camera and microphone permissions are required for video calls'
-          );
-          return;
-        }
-      }
+    init();
 
-      try {
-        const currentStream = await mediaDevices.getUserMedia({
-          audio: true,
-          video: {
-            width: { min: 640, ideal: 1280, max: 1920 },
-            height: { min: 480, ideal: 720, max: 1080 },
-            frameRate: 30,
-            facingMode: isFrontCamera ? 'user' : 'environment',
-          },
-        });
-        setStream(currentStream);
-        setLocalStream(currentStream);
-      } catch (error) {
-        console.error('Error getting media:', error);
-      }
-    };
+    // socket listeners
+    socket.on('me', (id: string) => setMe(id));
+    //@ts-ignore
+    socket.on('userList', (list) => setUsers(list));
 
-    getMedia();
+    //@ts-ignore
+    socket.on('callUser', async ({ from, name, signal }) => {
+      if (!pc.current) return;
+      await pc.current.setRemoteDescription(new RTCSessionDescription(signal));
+      const answer = await pc.current.createAnswer();
+      await pc.current.setLocalDescription(answer);
 
-    socket.on('me', (id: string) => {
-      setMe(id);
-      console.log('My socket ID:', id);
+      socket.emit('answerCall', { signal: answer, to: from });
+      setCall({ isReceivingCall: true, from, name, signal });
     });
 
-    socket.on('userList', (users: { name: string; userId: string }[]) => {
-      setUsers(users);
-      console.log('User list updated:', users);
-    });
-
-    socket.on(
-      'callUser',
-      ({ from, name, signal }: { from: string; name: string; signal: SignalData }) => {
-        setCall({
-          isReceivingCall: true,
-          from,
-          name,
-          signal,
-        });
-      }
-    );
-
-    socket.on('callAccepted', (signal: SignalData) => {
-      if (connectionRef.current) {
-        handleSignal(connectionRef.current, signal);
-        setCallAccepted(true);
-      }
-    });
-
-    socket.on('signal', (signal: SignalData) => {
-      if (connectionRef.current) {
-        handleSignal(connectionRef.current, signal);
-      }
+    //@ts-ignore
+    socket.on('callAccepted', async (signal) => {
+      if (!pc.current) return;
+      await pc.current.setRemoteDescription(new RTCSessionDescription(signal));
+      setCallAccepted(true);
     });
 
     socket.on('leaveCall', () => {
-      setCall(null);
-      setCallEnded(true);
-      setCallAccepted(false);
+      endCallCleanup();
+    });
 
-      if (remoteStream) {
-        remoteStream.getTracks().forEach((track) => track.stop());
-        setRemoteStream(null);
-      }
-
-      peerHandler.destroyPeer(connectionRef.current);
-      connectionRef.current = null;
+    socket.on('callEnded', () => {
+      endCallCleanup();
     });
 
     return () => {
+      pc.current?.close();
       socket.off('me');
       socket.off('userList');
       socket.off('callUser');
       socket.off('callAccepted');
-      socket.off('signal');
       socket.off('leaveCall');
+      socket.off('callEnded');
     };
-  }, [hasPermissions, isFrontCamera]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ==================== Call Actions ====================
-  const answerCall = () => {
-    if (!call || !stream) return;
+  const createPeerConnection = () => {
+    pc.current = new RTCPeerConnection(configuration);
 
-    const peer = peerHandler.createReceiverPeer(
-      stream,
-      call.signal,
-      (signalData) => {
-        socket.emit('answerCall', { signal: signalData, to: call.from });
-      },
-      (remoteStreamObj) => {
-        setRemoteStream(remoteStreamObj);
+    //@ts-ignore
+    pc.current.onicecandidate = (event) => {
+      if (event.candidate && call?.from) {
+        socket.emit('signal', { candidate: event.candidate, to: call.from });
       }
-    );
+    };
 
-    connectionRef.current = peer;
+    //@ts-ignore
+    pc.current.ontrack = (event) => {
+      setRemoteStream(event.streams[0]);
+    };
+  };
 
-    // Handle the initial offer signal
-    if (call.signal) {
-      handleSignal(peer, call.signal);
+  // ==================== Permissions ====================
+  const requestPermissions = async () => {
+    if (Platform.OS === 'android') {
+      await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+      ]);
     }
+  };
 
+  // ==================== Actions ====================
+  const answerCall = async () => {
+    if (!call || !pc.current) return;
+
+    await pc.current.setRemoteDescription(new RTCSessionDescription(call.signal));
+    const answer = await pc.current.createAnswer();
+    await pc.current.setLocalDescription(answer);
+
+    socket.emit('answerCall', { signal: answer, to: call.from });
     setCallAccepted(true);
   };
 
@@ -210,61 +197,55 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     socket.emit('registerUser', { name, userId });
   };
 
-  const callUser = (userId: string) => {
-    if (!stream) return;
+  const callUser = async (userId: string) => {
+    if (!pc.current) return;
 
-    const peer = peerHandler.createInitiatorPeer(
-      stream,
-      (signalData) => {
-        socket.emit('callUser', {
-          userToCall: userId,
-          signalData,
-          from: me,
-          name,
-        });
-      },
-      (remoteStreamObj) => {
-        setRemoteStream(remoteStreamObj);
-      }
-    );
+    const offer = await pc.current.createOffer();
+    await pc.current.setLocalDescription(offer);
 
-    connectionRef.current = peer;
+    socket.emit('callUser', { userToCall: userId, signalData: offer, from: me, name });
   };
 
   const leaveCall = (userId: string) => {
-    setCallEnded(true);
-    setCall(null);
-    setCallAccepted(false);
-
     socket.emit('leaveCall', { to: userId });
+    endCallCleanup();
+  };
+
+  const endCallCleanup = () => {
+    setCall(null);
+    setCallEnded(true);
+    setCallAccepted(false);
 
     if (remoteStream) {
       remoteStream.getTracks().forEach((track) => track.stop());
       setRemoteStream(null);
     }
 
-    peerHandler.destroyPeer(connectionRef.current);
-    connectionRef.current = null;
+    pc.current?.close();
+    createPeerConnection();
   };
 
-  // ==================== Media Toggles ====================
   const toggleVideo = () => {
-    if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideo(videoTrack.enabled);
-      }
+    const videoTrack = stream?.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      setIsVideo(videoTrack.enabled);
     }
   };
 
   const toggleAudio = () => {
-    if (stream) {
-      const audioTrack = stream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsAudio(audioTrack.enabled);
-      }
+    const audioTrack = stream?.getAudioTracks()[0];
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled;
+      setIsAudio(audioTrack.enabled);
+    }
+  };
+
+  const switchCamera = () => {
+    const videoTrack: any = stream?.getVideoTracks()[0];
+    if (videoTrack && typeof videoTrack._switchCamera === 'function') {
+      videoTrack._switchCamera();
+      setIsFrontCamera((prev) => !prev);
     }
   };
 
@@ -279,7 +260,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         name,
         setName,
         callEnded,
-        me: socket.id || me,
+        me,
         users,
         idToCall,
         setIdToCall,
@@ -295,6 +276,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         toggleAudio,
         isFrontCamera,
         setIsFrontCamera,
+        switchCamera,
       }}>
       {children}
     </SocketContext.Provider>
