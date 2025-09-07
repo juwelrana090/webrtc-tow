@@ -10,6 +10,7 @@
     "scheme": "calling",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "jsEngine": "jsc",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.webrtcbarc.calling",
@@ -34,6 +35,7 @@
     },
     "plugins": [
       "expo-router",
+      "@config-plugins/react-native-webrtc",
       [
         "expo-splash-screen",
         {

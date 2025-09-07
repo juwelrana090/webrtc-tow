@@ -73,7 +73,7 @@ const AddUser = () => {
       ) : (
         <View className="flex w-full flex-col gap-4">
           <View className="bg-dark-200 flex-row justify-center rounded-full px-5 py-4">
-            <Text className="text-secondary ml-2 text-base font-semibold">Name:</Text>
+            <Text className="text-gray-500 ml-2 text-base font-semibold">Name:</Text>
           </View>
 
           <View className="bg-dark-200 flex-row justify-center rounded-full px-5 py-4">

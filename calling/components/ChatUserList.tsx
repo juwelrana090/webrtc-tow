@@ -41,6 +41,8 @@ const ChatUserList = () => {
     );
   }
 
+  console.log('Rendering users:', users);
+
   // return (
   //   <FlatList
   //     data={users}
