@@ -1,3 +1,4 @@
+import AddUser from '@/components/AddUser';
 import { ContextProvider } from '@/hooks/SocketContext';
 import React from 'react';
 import { Text, View } from 'react-native';
@@ -11,7 +12,9 @@ export default function Index() {
             <Text className="text-2xl font-bold text-white">QuickChat</Text>
           </View>
         </View>
-        <View className="mt-2 flex w-full flex-1 justify-center px-2">{/* <AddUser /> */}</View>
+        <View className="mt-2 flex w-full flex-1 justify-center px-2">
+          <AddUser />
+        </View>
       </View>
     </ContextProvider>
   );
