@@ -1,12 +1,10 @@
 import { SocketContext } from '@/hooks/SocketContext';
-import React, { useContext, useState } from 'react';
+import React, { useContext } from 'react';
 import { Text, View } from 'react-native';
 import { RTCView } from 'react-native-webrtc';
 
 const VideoPlayer = () => {
   const socketContext = useContext(SocketContext);
-  const [localStreamUrl, setLocalStreamUrl] = useState('');
-  const [remoteStreamUrl, setRemoteStreamUrl] = useState('');
 
   if (!socketContext) {
     return (
@@ -15,7 +13,6 @@ const VideoPlayer = () => {
       </View>
     );
   }
-
   const { call, callAccepted, localStream, remoteStream, stream, name, callEnded } = socketContext;
 
   return (
@@ -56,7 +53,7 @@ const VideoPlayer = () => {
         )}
 
         {/* Call Status Indicators */}
-        {callAccepted && !callEnded && !remoteStreamUrl && (
+        {callAccepted && !callEnded && !remoteStream && (
           <View className="absolute right-2 top-2 h-48 w-32 items-center justify-center rounded-lg bg-gray-700">
             <View className="animate-pulse">
               <View className="mb-2 h-12 w-12 rounded-full bg-blue-500"></View>

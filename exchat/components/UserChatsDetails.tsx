@@ -1,7 +1,14 @@
 import { useSocket } from '@/hooks/useSocket';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Button,
+  SafeAreaView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import VideoPlayer from './VideoPlayer';
 
 interface Props {
@@ -71,6 +78,15 @@ const UserChatsDetails = ({ id, router }: Props) => {
         </View>
       </View>
 
+      <View className="absolute left-0 right-0 top-20 z-50 w-full">
+        {call?.isReceivingCall && !callAccepted && (
+          <View className="flex items-center justify-center rounded bg-yellow-200 p-4 text-black">
+            <Text className="text-lg font-semibold">{call.name} is calling:</Text>
+            <Button title="Answer" color="#00dd37b2" onPress={answerCall} />
+          </View>
+        )}
+      </View>
+
       {/* Video Player */}
       <View className="flex-1">
         <VideoPlayer />
@@ -100,13 +116,13 @@ const UserChatsDetails = ({ id, router }: Props) => {
           {/* Call Actions */}
           {callAccepted && !callEnded ? (
             <TouchableOpacity
-              onPress={() => leaveCall(user?.userId)}
+              onPress={() => leaveCall(id)}
               className="h-14 w-14 items-center justify-center rounded-full bg-red-600">
               <Text className="text-xl font-bold text-white">📞</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              onPress={() => callUser(user?.userId)}
+              onPress={() => callUser(id)}
               className="h-14 w-14 items-center justify-center rounded-full bg-green-600">
               <Text className="text-xl font-bold text-white">📞</Text>
             </TouchableOpacity>

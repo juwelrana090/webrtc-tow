@@ -3,7 +3,7 @@ import React, { createContext, useEffect, useRef, useState } from 'react';
 import { Alert, PermissionsAndroid, Platform } from 'react-native';
 import { mediaDevices, MediaStream } from 'react-native-webrtc';
 import io from 'socket.io-client';
-import { peerHandler, SignalData } from './peerHandler';
+import { handleSignal, peerHandler, SignalData } from './peerHandler';
 
 // ==================== Types ====================
 interface CallInfo {
@@ -146,14 +146,14 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
     socket.on('callAccepted', (signal: SignalData) => {
       if (connectionRef.current) {
-        peerHandler.handleSignal(connectionRef.current, signal, () => {});
+        handleSignal(connectionRef.current, signal);
         setCallAccepted(true);
       }
     });
 
     socket.on('signal', (signal: SignalData) => {
       if (connectionRef.current) {
-        peerHandler.handleSignal(connectionRef.current, signal, () => {});
+        handleSignal(connectionRef.current, signal);
       }
     });
 
@@ -187,6 +187,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
     const peer = peerHandler.createReceiverPeer(
       stream,
+      call.signal,
       (signalData) => {
         socket.emit('answerCall', { signal: signalData, to: call.from });
       },
@@ -199,9 +200,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
     // Handle the initial offer signal
     if (call.signal) {
-      peerHandler.handleSignal(peer, call.signal, (signalData) => {
-        socket.emit('answerCall', { signal: signalData, to: call.from });
-      });
+      handleSignal(peer, call.signal);
     }
 
     setCallAccepted(true);

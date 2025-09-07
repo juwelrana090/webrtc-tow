@@ -6,6 +6,7 @@ export interface PeerHandlers {
     onSignal: (signalData: Peer.SignalData) => void,
     onStream: (remoteStream: MediaStream) => void
   ) => Peer.Instance;
+
   createReceiverPeer: (
     stream: MediaStream,
     remoteSignal: Peer.SignalData,

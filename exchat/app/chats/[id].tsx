@@ -8,7 +8,7 @@ const UserChats = () => {
   const { id } = useLocalSearchParams();
   return (
     <ContextProvider>
-      <View className="flex-1 bg-gray-100">
+      <View className="bg-primary flex-1">
         <UserChatsDetails id={id.toString()} router={router} />
       </View>
     </ContextProvider>

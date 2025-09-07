@@ -6,21 +6,9 @@ import {
 } from 'react-native-webrtc';
 
 export interface SignalData {
-  type?: 'offer' | 'answer' | 'candidate';
+  type?: 'offer' | 'answer' | 'pranswer' | 'rollback';
   sdp?: string;
-  candidate?: RTCIceCandidateInit; // Changed to RTCIceCandidateInit for better compatibility
-}
-
-export interface PeerInstance {
-  addStream: (stream: MediaStream) => void;
-  createOffer: () => Promise<RTCSessionDescription>;
-  createAnswer: () => Promise<RTCSessionDescription>;
-  setLocalDescription: (description: RTCSessionDescription) => Promise<void>;
-  setRemoteDescription: (description: RTCSessionDescription) => Promise<void>;
-  addIceCandidate: (candidate: RTCIceCandidate) => Promise<void>;
-  close: () => void;
-  onicecandidate: ((event: { candidate: RTCIceCandidate | null }) => void) | null;
-  onaddstream: ((event: { stream: MediaStream }) => void) | null;
+  candidate?: RTCIceCandidate;
 }
 
 export interface PeerHandlers {
@@ -28,21 +16,17 @@ export interface PeerHandlers {
     stream: MediaStream,
     onSignal: (signalData: SignalData) => void,
     onStream: (remoteStream: MediaStream) => void
-  ) => PeerInstance;
+  ) => RTCPeerConnection;
   createReceiverPeer: (
     stream: MediaStream,
+    remoteSignal: SignalData,
     onSignal: (signalData: SignalData) => void,
     onStream: (remoteStream: MediaStream) => void
-  ) => PeerInstance;
-  destroyPeer: (peer: PeerInstance | null) => void;
-  handleSignal: (
-    peer: PeerInstance,
-    signal: SignalData,
-    onSignal: (signalData: SignalData) => void
-  ) => void;
+  ) => RTCPeerConnection;
+  destroyPeer: (peer: RTCPeerConnection | null) => void;
 }
 
-const configuration: RTCConfiguration = {
+const configuration = {
   iceServers: [
     // Your TURN server
     {
@@ -77,164 +61,97 @@ const configuration: RTCConfiguration = {
       urls: 'stun:stun4.l.google.com:19302',
     },
   ],
-  iceCandidatePoolSize: 10, // Added for better performance
 };
-
-class PeerWrapper implements PeerInstance {
-  public peerConnection: RTCPeerConnection;
-  private pendingCandidates: RTCIceCandidate[] = [];
-  private isRemoteDescriptionSet = false;
-
-  public onicecandidate: ((event: { candidate: RTCIceCandidate | null }) => void) | null = null;
-  public onaddstream: ((event: { stream: MediaStream }) => void) | null = null;
-
-  constructor() {
-    this.peerConnection = new RTCPeerConnection(configuration);
-    this.setupEventHandlers();
-  }
-
-  private setupEventHandlers() {
-    //@ts-ignore
-    this.peerConnection.onicecandidate = (event) => {
-      if (this.onicecandidate) {
-        this.onicecandidate(event);
-      }
-    };
-
-    //@ts-ignore
-    this.peerConnection.onaddstream = (event) => {
-      if (this.onaddstream) {
-        this.onaddstream(event);
-      }
-    };
-
-    // Add additional event handlers for better error handling
-    //@ts-ignore
-    this.peerConnection.onconnectionstatechange = () => {
-      console.log('Connection state changed:', this.peerConnection.connectionState);
-    };
-
-    //@ts-ignore
-    this.peerConnection.oniceconnectionstatechange = () => {
-      console.log('ICE connection state changed:', this.peerConnection.iceConnectionState);
-    };
-  }
-
-  addStream(stream: MediaStream) {
-    //@ts-ignore
-    this.peerConnection.addStream(stream);
-  }
-
-  async createOffer(): Promise<RTCSessionDescription> {
-    const offer = await this.peerConnection.createOffer({
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: true,
-    });
-    return offer;
-  }
-
-  async createAnswer(): Promise<RTCSessionDescription> {
-    const answer = await this.peerConnection.createAnswer();
-    return answer;
-  }
-
-  async setLocalDescription(description: RTCSessionDescription): Promise<void> {
-    await this.peerConnection.setLocalDescription(description);
-  }
-
-  async setRemoteDescription(description: RTCSessionDescription): Promise<void> {
-    try {
-      await this.peerConnection.setRemoteDescription(description);
-      this.isRemoteDescriptionSet = true;
-
-      // Add any pending ICE candidates
-      for (const candidate of this.pendingCandidates) {
-        await this.peerConnection.addIceCandidate(candidate);
-      }
-      this.pendingCandidates = [];
-    } catch (error) {
-      console.error('Error setting remote description:', error);
-      throw error;
-    }
-  }
-
-  async addIceCandidate(candidate: RTCIceCandidate): Promise<void> {
-    try {
-      if (this.isRemoteDescriptionSet) {
-        await this.peerConnection.addIceCandidate(candidate);
-      } else {
-        // Queue the candidate until remote description is set
-        this.pendingCandidates.push(candidate);
-      }
-    } catch (error) {
-      console.error('Error adding ICE candidate:', error);
-      throw error;
-    }
-  }
-
-  close() {
-    this.peerConnection.close();
-  }
-}
 
 export const peerHandler: PeerHandlers = {
   createInitiatorPeer(stream, onSignal, onStream) {
-    const peer = new PeerWrapper();
+    const peer = new RTCPeerConnection(configuration) as any;
 
-    peer.addStream(stream);
+    // Add stream to peer connection
+    stream.getTracks().forEach((track) => {
+      peer.addTrack(track, stream);
+    });
 
-    peer.onicecandidate = (event) => {
+    // Handle ICE candidates
+    peer.onicecandidate = (event: any) => {
       if (event.candidate) {
-        onSignal({
-          type: 'candidate',
-          candidate: event.candidate.toJSON(), // Convert to JSON for better serialization
-        });
+        onSignal({ candidate: event.candidate });
       }
     };
 
-    peer.onaddstream = (event) => {
+    // Handle remote stream
+    peer.onaddstream = (event: any) => {
       onStream(event.stream);
     };
 
-    // Create and set offer
+    // Create offer
     peer
       .createOffer()
-      .then((offer) => {
+      .then((offer: any) => {
         return peer.setLocalDescription(offer);
       })
       .then(() => {
-        // Get the local description after setting it
-        if (peer.peerConnection.localDescription) {
+        if (peer.localDescription) {
           onSignal({
-            type: 'offer',
-            sdp: peer.peerConnection.localDescription.sdp,
+            type: peer.localDescription.type as 'offer',
+            sdp: peer.localDescription.sdp,
           });
         }
       })
-      .catch((error) => {
+      .catch((error: any) => {
         console.error('Error creating offer:', error);
       });
 
     return peer;
   },
 
-  createReceiverPeer(stream, onSignal, onStream) {
-    const peer = new PeerWrapper();
+  createReceiverPeer(stream, remoteSignal, onSignal, onStream) {
+    const peer = new RTCPeerConnection(configuration) as any;
 
-    peer.addStream(stream);
+    // Add stream to peer connection
+    stream.getTracks().forEach((track) => {
+      peer.addTrack(track, stream);
+    });
 
-    peer.onicecandidate = (event) => {
+    // Handle ICE candidates
+    peer.onicecandidate = (event: any) => {
       if (event.candidate) {
-        onSignal({
-          type: 'candidate',
-          candidate: event.candidate.toJSON(), // Convert to JSON for better serialization
-        });
+        onSignal({ candidate: event.candidate });
       }
     };
 
-    peer.onaddstream = (event) => {
+    // Handle remote stream
+    peer.onaddstream = (event: any) => {
       onStream(event.stream);
     };
+
+    // Set remote description and create answer
+    if (remoteSignal.type && remoteSignal.sdp) {
+      const remoteDescription = new RTCSessionDescription({
+        type: remoteSignal.type,
+        sdp: remoteSignal.sdp,
+      });
+
+      peer
+        .setRemoteDescription(remoteDescription)
+        .then(() => {
+          return peer.createAnswer();
+        })
+        .then((answer: any) => {
+          return peer.setLocalDescription(answer);
+        })
+        .then(() => {
+          if (peer.localDescription) {
+            onSignal({
+              type: peer.localDescription.type as 'answer',
+              sdp: peer.localDescription.sdp,
+            });
+          }
+        })
+        .catch((error: any) => {
+          console.error('Error handling remote signal:', error);
+        });
+    }
 
     return peer;
   },
@@ -244,47 +161,30 @@ export const peerHandler: PeerHandlers = {
       peer.close();
     }
   },
+};
 
-  handleSignal(peer: PeerInstance, signal: SignalData, onSignal: (signalData: SignalData) => void) {
-    if (signal.type === 'offer' && signal.sdp) {
+// Helper function to handle signaling after peer creation
+export const handleSignal = (peer: RTCPeerConnection, signalData: SignalData): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (signalData.candidate) {
+      // Handle ICE candidate
+      peer
+        .addIceCandidate(signalData.candidate)
+        .then(() => resolve())
+        .catch(reject);
+    } else if (signalData.type && signalData.sdp) {
+      // Handle SDP (answer from receiver)
       const remoteDescription = new RTCSessionDescription({
-        type: 'offer',
-        sdp: signal.sdp,
+        type: signalData.type,
+        sdp: signalData.sdp,
       });
 
       peer
         .setRemoteDescription(remoteDescription)
-        .then(() => {
-          return peer.createAnswer();
-        })
-        .then((answer) => {
-          return peer.setLocalDescription(answer);
-        })
-        .then(() => {
-          if (peer instanceof PeerWrapper && peer.peerConnection.localDescription) {
-            onSignal({
-              type: 'answer',
-              sdp: peer.peerConnection.localDescription.sdp,
-            });
-          }
-        })
-        .catch((error) => {
-          console.error('Error handling offer:', error);
-        });
-    } else if (signal.type === 'answer' && signal.sdp) {
-      const remoteDescription = new RTCSessionDescription({
-        type: 'answer',
-        sdp: signal.sdp,
-      });
-
-      peer.setRemoteDescription(remoteDescription).catch((error) => {
-        console.error('Error setting remote description (answer):', error);
-      });
-    } else if (signal.type === 'candidate' && signal.candidate) {
-      const iceCandidate = new RTCIceCandidate(signal.candidate);
-      peer.addIceCandidate(iceCandidate).catch((error) => {
-        console.error('Error adding ICE candidate:', error);
-      });
+        .then(() => resolve())
+        .catch(reject);
+    } else {
+      resolve();
     }
-  },
+  });
 };
