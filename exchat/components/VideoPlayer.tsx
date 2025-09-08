@@ -16,17 +16,10 @@ const VideoPlayer = () => {
 
   const { call, callAccepted, localStream, remoteStream, name, callEnded } = socketContext;
 
-  console.log('Rendering VideoPlayer with call:', call);
-  console.log('Rendering VideoPlayer with callAccepted:', callAccepted);
-  console.log('Rendering VideoPlayer with localStream:', localStream);
-  console.log('Rendering VideoPlayer with remoteStream:', remoteStream);
-  console.log('Rendering VideoPlayer with name:', name);
-  console.log('Rendering VideoPlayer with callEnded:', callEnded);
-
   return (
     <View className="z-10 flex h-full w-full items-center justify-center bg-gray-900 px-0 py-0">
       <View className="h-full w-full overflow-hidden">
-        {/* Remote Video Stream (Main View) */}
+        {/* Remote Video (Main) */}
         {callAccepted && !callEnded && remoteStream ? (
           <RTCView
             streamURL={remoteStream.toURL()}
@@ -41,12 +34,12 @@ const VideoPlayer = () => {
               </Text>
             </View>
             <Text className="mt-4 text-white">
-              {call ? `Incoming call from ${call.name}` : 'Waiting for connection...'}
+              {call ? `📞 Incoming call from ${call.name}` : '⏳ Waiting for connection...'}
             </Text>
           </View>
         )}
 
-        {/* Local Video Stream (Picture-in-Picture) */}
+        {/* Local Video (PiP) */}
         {localStream && (
           <View className="absolute right-2 top-2 h-48 w-32 overflow-hidden rounded-lg border-2 border-white bg-gray-700">
             <RTCView
@@ -61,18 +54,18 @@ const VideoPlayer = () => {
           </View>
         )}
 
-        {/* Connecting Indicator */}
+        {/* Connecting Overlay */}
         {callAccepted && !callEnded && !remoteStream && (
           <View className="absolute inset-0 items-center justify-center bg-black bg-opacity-70">
             <ActivityIndicator size="large" color="#ffffff" />
-            <Text className="mt-4 text-white">Connecting...</Text>
+            <Text className="mt-4 text-white">⏳ Connecting...</Text>
           </View>
         )}
 
-        {/* Incoming Call Indicator */}
+        {/* Incoming Call Overlay */}
         {call && !callAccepted && (
           <View className="absolute inset-0 items-center justify-center bg-black bg-opacity-70">
-            <Text className="text-xl text-white">Incoming call from {call.name}</Text>
+            <Text className="text-xl text-white">📞 Incoming call from {call.name}</Text>
           </View>
         )}
       </View>

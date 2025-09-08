@@ -144,7 +144,7 @@ io.on("connection", (socket) => {
 
     // Forward the call to target user
     io.to(targetUser.socketId).emit("callUser", {
-      signal: signalData,
+      signal: signalData, // ✅ Correct
       from: from,
       name: name,
     });

@@ -33,7 +33,6 @@ export interface PeerHandlers {
 
 const configuration: RTCConfiguration = {
   iceServers: [
-    // Your TURN server
     {
       urls: [
         'stun:188.245.189.30:3478',
@@ -43,64 +42,48 @@ const configuration: RTCConfiguration = {
       username: 'turnserver',
       credential: 'dev',
     },
-    // With SSL (if configured)
     {
       urls: ['turns:188.245.189.30:5349', 'turns:188.245.189.30:5349?transport=tcp'],
       username: 'turnserver',
       credential: 'dev',
     },
-    // Backup public STUN
-    {
-      urls: 'stun:stun.l.google.com:19302',
-    },
-    {
-      urls: 'stun:stun1.l.google.com:19302',
-    },
-    {
-      urls: 'stun:stun2.l.google.com:19302',
-    },
-    {
-      urls: 'stun:stun3.l.google.com:19302',
-    },
-    {
-      urls: 'stun:stun4.l.google.com:19302',
-    },
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
   ],
 };
 
 const sessionConstraints = {
-  mandatory: {
-    OfferToReceiveAudio: true,
-    OfferToReceiveVideo: true,
-    VoiceActivityDetection: true,
-  },
+  offerToReceiveAudio: true,
+  offerToReceiveVideo: true,
+  voiceActivityDetection: true,
 };
 
-// Helper function to process queued remote candidates
 const processCandidates = (peer: PeerConnection): void => {
   if (!peer.remoteCandidates || peer.remoteCandidates.length < 1) return;
 
   peer.remoteCandidates.forEach((candidate) => {
     peer.addIceCandidate(candidate).catch((err) => {
-      console.error('Error adding ICE candidate:', err);
+      console.error('❌ Error adding queued ICE candidate:', err);
     });
   });
   peer.remoteCandidates = [];
 };
 
-// Helper function to handle remote candidates
 const handleRemoteCandidate = (peer: PeerConnection, iceCandidate: RTCIceCandidate): void => {
   if (!peer.remoteDescription) {
-    // Queue candidates if remote description is not set yet
     if (!peer.remoteCandidates) {
       peer.remoteCandidates = [];
     }
     peer.remoteCandidates.push(iceCandidate);
+    console.log('🧊 Queued ICE candidate (no remoteDescription yet)');
     return;
   }
 
   peer.addIceCandidate(iceCandidate).catch((err) => {
-    console.error('Error adding ICE candidate:', err);
+    console.error('❌ Error adding ICE candidate:', err);
   });
 };
 
@@ -109,75 +92,72 @@ export const peerHandler: PeerHandlers = {
     const peerConnection = new RTCPeerConnection(configuration) as PeerConnection;
     peerConnection.remoteCandidates = [];
 
-    // Set up event listeners
-    //@ts-ignore
-    peerConnection.addEventListener('connectionstatechange', () => {
+    peerConnection.onconnectionstatechange = () => {
+      console.log('🔗 Connection State:', peerConnection.connectionState);
       switch (peerConnection.connectionState) {
         case 'closed':
-          console.log('Peer connection closed');
+          console.log('🔚 Peer connection closed');
           break;
         case 'connected':
-          console.log('Peer connection established');
+          console.log('✅ Peer connection established');
           break;
       }
-    });
+    };
 
-    //@ts-ignore
-    peerConnection.addEventListener('icecandidate', (event) => {
+    peerConnection.onicecandidate = (event) => {
       if (!event.candidate) {
-        // ICE gathering completed
-        console.log('ICE gathering completed');
+        console.log('✅ ICE gathering completed');
         return;
       }
+      onSignal({ type: 'candidate', candidate: event.candidate });
+    };
 
-      onSignal({
-        type: 'candidate',
-        candidate: event.candidate,
-      });
-    });
+    peerConnection.onicecandidateerror = (event) => {
+      console.warn('⚠️ ICE candidate error:', event);
+    };
 
-    //@ts-ignore
-    peerConnection.addEventListener('icecandidateerror', (event) => {
-      console.warn('ICE candidate error:', event);
-    });
-
-    //@ts-ignore
-    peerConnection.addEventListener('iceconnectionstatechange', () => {
+    peerConnection.oniceconnectionstatechange = () => {
+      console.log('🧊 ICE Connection State:', peerConnection.iceConnectionState);
       switch (peerConnection.iceConnectionState) {
         case 'connected':
         case 'completed':
-          console.log('ICE connection established');
+          console.log('✅ ICE connection established');
           break;
         case 'failed':
-          console.error('ICE connection failed');
+          console.error('❌ ICE connection failed');
+          break;
+        case 'disconnected':
+          console.warn('⚠️ ICE connection disconnected');
           break;
       }
-    });
+    };
 
-    //@ts-ignore
-    peerConnection.addEventListener('addstream', (event) => {
-      onStream(event.stream);
-    });
+    peerConnection.ontrack = (event) => {
+      console.log('🎥 ontrack fired for track:', event.track.kind);
+      if (event.streams && event.streams[0]) {
+        console.log('🎯 Setting remote stream:', event.streams[0].id);
+        onStream(event.streams[0]);
+      } else {
+        console.warn('⚠️ No stream in ontrack event');
+      }
+    };
 
-    //@ts-ignore
-    peerConnection.addEventListener('negotiationneeded', async () => {
+    peerConnection.onnegotiationneeded = async () => {
       try {
-        //@ts-ignore
+        console.log('🔄 Negotiation needed, creating offer');
         const offerDescription = await peerConnection.createOffer(sessionConstraints);
         await peerConnection.setLocalDescription(offerDescription);
-
-        onSignal({
-          type: 'offer',
-          sdp: offerDescription.sdp,
-        });
+        onSignal({ type: 'offer', sdp: offerDescription.sdp });
       } catch (err) {
-        console.error('Error creating offer:', err);
+        console.error('❌ Error creating offer:', err);
       }
-    });
+    };
 
-    // Add the local stream
-    //@ts-ignore
-    peerConnection.addStream(stream);
+    console.log('➕ Adding local stream tracks');
+    stream.getTracks().forEach((track) => {
+      console.log('➕ Adding track:', track.kind);
+      peerConnection.addTrack(track, stream);
+    });
 
     return peerConnection;
   },
@@ -186,81 +166,74 @@ export const peerHandler: PeerHandlers = {
     const peerConnection = new RTCPeerConnection(configuration) as PeerConnection;
     peerConnection.remoteCandidates = [];
 
-    // Set up event listeners
-    //@ts-ignore
-    peerConnection.addEventListener('connectionstatechange', () => {
+    peerConnection.onconnectionstatechange = () => {
       switch (peerConnection.connectionState) {
         case 'closed':
-          console.log('Peer connection closed');
+          console.log('🔚 Peer connection closed');
           break;
         case 'connected':
-          console.log('Peer connection established');
+          console.log('✅ Peer connection established');
           break;
       }
-    });
+    };
 
-    //@ts-ignore
-    peerConnection.addEventListener('icecandidate', (event) => {
+    peerConnection.onicecandidate = (event) => {
       if (!event.candidate) {
-        console.log('ICE gathering completed');
+        console.log('✅ ICE gathering completed');
         return;
       }
+      onSignal({ type: 'candidate', candidate: event.candidate });
+    };
 
-      onSignal({
-        type: 'candidate',
-        candidate: event.candidate,
-      });
-    });
+    peerConnection.onicecandidateerror = (event) => {
+      console.warn('⚠️ ICE candidate error:', event);
+    };
 
-    //@ts-ignore
-    peerConnection.addEventListener('icecandidateerror', (event) => {
-      console.warn('ICE candidate error:', event);
-    });
-
-    //@ts-ignore
-    peerConnection.addEventListener('iceconnectionstatechange', () => {
+    peerConnection.oniceconnectionstatechange = () => {
       switch (peerConnection.iceConnectionState) {
         case 'connected':
         case 'completed':
-          console.log('ICE connection established');
+          console.log('✅ ICE connection established');
           break;
         case 'failed':
-          console.error('ICE connection failed');
+          console.error('❌ ICE connection failed');
           break;
       }
+    };
+
+    peerConnection.ontrack = (event) => {
+      console.log('🎥 ontrack fired for track:', event.track.kind);
+      if (event.streams && event.streams[0]) {
+        console.log('🎯 Setting remote stream:', event.streams[0].id);
+        onStream(event.streams[0]);
+      } else {
+        console.warn('⚠️ No stream in ontrack event');
+      }
+    };
+
+    console.log('➕ Adding local stream tracks');
+    stream.getTracks().forEach((track) => {
+      console.log('➕ Adding track:', track.kind);
+      peerConnection.addTrack(track, stream);
     });
 
-    //@ts-ignore
-    peerConnection.addEventListener('addstream', (event) => {
-      onStream(event.stream);
-    });
-
-    // Add the local stream
-    //@ts-ignore
-    peerConnection.addStream(stream);
-
-    // Handle the initial remote signal (should be an offer)
     if (remoteSignal.type === 'offer' && remoteSignal.sdp) {
       try {
+        console.log('📥 Processing remote offer');
         const offerDescription = new RTCSessionDescription({
           type: 'offer',
           sdp: remoteSignal.sdp,
         });
 
         await peerConnection.setRemoteDescription(offerDescription);
-        //@ts-ignore
         const answerDescription = await peerConnection.createAnswer(sessionConstraints);
         await peerConnection.setLocalDescription(answerDescription);
 
-        // Process any queued candidates
         processCandidates(peerConnection);
 
-        onSignal({
-          type: 'answer',
-          sdp: answerDescription.sdp,
-        });
+        onSignal({ type: 'answer', sdp: answerDescription.sdp });
       } catch (err) {
-        console.error('Error creating answer:', err);
+        console.error('❌ Error creating answer:', err);
         throw err;
       }
     }
@@ -273,6 +246,7 @@ export const peerHandler: PeerHandlers = {
       switch (signalData.type) {
         case 'offer':
           if (signalData.sdp) {
+            console.log('📥 Handling remote offer');
             const offerDescription = new RTCSessionDescription({
               type: 'offer',
               sdp: signalData.sdp,
@@ -284,6 +258,7 @@ export const peerHandler: PeerHandlers = {
 
         case 'answer':
           if (signalData.sdp) {
+            console.log('📥 Handling remote answer');
             const answerDescription = new RTCSessionDescription({
               type: 'answer',
               sdp: signalData.sdp,
@@ -295,22 +270,23 @@ export const peerHandler: PeerHandlers = {
 
         case 'candidate':
           if (signalData.candidate) {
+            console.log('🧊 Handling remote ICE candidate');
             handleRemoteCandidate(peer, signalData.candidate);
           }
           break;
 
         default:
-          console.warn('Unknown signal type:', signalData.type);
+          console.warn('⚠️ Unknown signal type:', signalData.type);
       }
     } catch (err) {
-      console.error('Error handling remote signal:', err);
+      console.error('❌ Error handling remote signal:', err);
       throw err;
     }
   },
 
   destroyPeer(peer) {
     if (peer) {
-      // Clean up event listeners and close connection
+      console.log('🧹 Destroying peer connection');
       peer.close();
     }
   },

@@ -48,3 +48,10 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+```sh
+
+npx expo run:android --device=WWRC4PBYWO4TDUYD
+npx expo run:android --device=emulator-5554
+
+```

@@ -111,7 +111,6 @@ export const peerHandler: PeerHandlers = {
 
     // Set up event listeners
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('connectionstatechange', () => {
       switch (peerConnection.connectionState) {
         case 'closed':
@@ -124,7 +123,6 @@ export const peerHandler: PeerHandlers = {
     });
 
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('icecandidate', (event) => {
       if (!event.candidate) {
         // ICE gathering completed
@@ -139,13 +137,11 @@ export const peerHandler: PeerHandlers = {
     });
 
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('icecandidateerror', (event) => {
       console.warn('ICE candidate error:', event);
     });
 
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('iceconnectionstatechange', () => {
       switch (peerConnection.iceConnectionState) {
         case 'connected':
@@ -159,17 +155,14 @@ export const peerHandler: PeerHandlers = {
     });
 
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('addstream', (event) => {
       onStream(event.stream);
     });
 
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('negotiationneeded', async () => {
       try {
         //@ts-ignore
-        //@ts-nocheck
         const offerDescription = await peerConnection.createOffer(sessionConstraints);
         await peerConnection.setLocalDescription(offerDescription);
 
@@ -184,7 +177,6 @@ export const peerHandler: PeerHandlers = {
 
     // Add the local stream
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addStream(stream);
 
     return peerConnection;
@@ -196,7 +188,6 @@ export const peerHandler: PeerHandlers = {
 
     // Set up event listeners
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('connectionstatechange', () => {
       switch (peerConnection.connectionState) {
         case 'closed':
@@ -209,7 +200,6 @@ export const peerHandler: PeerHandlers = {
     });
 
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('icecandidate', (event) => {
       if (!event.candidate) {
         console.log('ICE gathering completed');
@@ -223,13 +213,11 @@ export const peerHandler: PeerHandlers = {
     });
 
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('icecandidateerror', (event) => {
       console.warn('ICE candidate error:', event);
     });
 
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('iceconnectionstatechange', () => {
       switch (peerConnection.iceConnectionState) {
         case 'connected':
@@ -243,14 +231,12 @@ export const peerHandler: PeerHandlers = {
     });
 
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addEventListener('addstream', (event) => {
       onStream(event.stream);
     });
 
     // Add the local stream
     //@ts-ignore
-    //@ts-nocheck
     peerConnection.addStream(stream);
 
     // Handle the initial remote signal (should be an offer)
@@ -263,7 +249,6 @@ export const peerHandler: PeerHandlers = {
 
         await peerConnection.setRemoteDescription(offerDescription);
         //@ts-ignore
-        //@ts-nocheck
         const answerDescription = await peerConnection.createAnswer(sessionConstraints);
         await peerConnection.setLocalDescription(answerDescription);
 

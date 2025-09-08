@@ -81,7 +81,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     socket.on('userList', (users: { name: string; userId: string }[]) => setUsers(users));
 
     socket.on('callUser', async (data: { from: string; name: string; signal: SignalData }) => {
-      console.log('Incoming call from:', data.from);
+      console.log('📞 Incoming call from:', data.from);
       setCall({
         isReceivingCall: true,
         from: data.from,
@@ -94,12 +94,12 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
       if (!peerRef.current || !isCalling.current) return;
 
       try {
-        console.log('Call accepted, processing answer signal');
+        console.log('✅ Call accepted, processing answer signal');
         await peerHandler.handleRemoteSignal(peerRef.current, data.signal);
         setCallAccepted(true);
         isCalling.current = false;
       } catch (error) {
-        console.error('Error handling call accepted signal:', error);
+        console.error('❌ Error handling call accepted signal:', error);
         isCalling.current = false;
       }
     });
@@ -108,15 +108,15 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
       if (!peerRef.current) return;
 
       try {
-        console.log('Received signal:', data.signal.type);
+        console.log(`📡 Received signal: ${data.signal.type}`);
         await peerHandler.handleRemoteSignal(peerRef.current, data.signal);
       } catch (err) {
-        console.error('Error handling signal:', err);
+        console.error('❌ Error handling signal:', err);
       }
     });
 
     socket.on('leaveCall', () => {
-      console.log('Remote user left the call');
+      console.log('🚪 Remote user left the call');
       endCallCleanup();
     });
 
@@ -147,7 +147,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
       setLocalStream(currentStream);
       return currentStream;
     } catch (error) {
-      console.error('Error getting media stream:', error);
+      console.error('❌ Error getting media stream:', error);
       throw error;
     }
   };
@@ -165,12 +165,12 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
           grants['android.permission.CAMERA'] !== PermissionsAndroid.RESULTS.GRANTED ||
           grants['android.permission.RECORD_AUDIO'] !== PermissionsAndroid.RESULTS.GRANTED
         ) {
-          console.error('Required permissions not granted');
+          console.error('❌ Required permissions not granted');
           return false;
         }
         return true;
       } catch (error) {
-        console.error('Error requesting permissions:', error);
+        console.error('❌ Error requesting permissions:', error);
         return false;
       }
     }
@@ -186,12 +186,12 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
   };
 
   const handleSignalData = (signalData: SignalData) => {
-    console.log('Sending signal:', signalData.type);
+    console.log(`📤 Sending signal: ${signalData.type}`);
     socket.emit('signal', { signal: signalData });
   };
 
   const handleRemoteStream = (stream: MediaStream) => {
-    console.log('Received remote stream');
+    console.log('🎥 Received remote stream with ID:', stream.id);
     setRemoteStream(stream);
   };
 
@@ -202,17 +202,14 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     isAnswering.current = true;
 
     try {
-      console.log('Answering call from:', call.from);
+      console.log('📞 Answering call from:', call.from);
 
-      // Clean up any existing peer
       cleanupPeer();
 
-      // Create receiver peer
       peerRef.current = await peerHandler.createReceiverPeer(
         stream,
         call.signal,
         (signalData) => {
-          // Send answer signal back to caller
           if (signalData.type === 'answer') {
             socket.emit('answerCall', { signal: signalData, to: call.from });
           } else {
@@ -226,7 +223,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
       setCall(null);
       isAnswering.current = false;
     } catch (error) {
-      console.error('Error answering call:', error);
+      console.error('❌ Error answering call:', error);
       isAnswering.current = false;
     }
   };
@@ -241,20 +238,18 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     isCalling.current = true;
 
     try {
-      console.log('Calling user:', userId);
+      console.log('📞 Calling user:', userId);
 
-      // Clean up any existing peer
       cleanupPeer();
 
-      // Create initiator peer
       peerRef.current = peerHandler.createInitiatorPeer(
         stream,
         (signalData) => {
-          // Send offer signal to the user we want to call
           if (signalData.type === 'offer') {
+            // ✅ FIXED: Use "signal", not "signalData"
             socket.emit('callUser', {
               userToCall: userId,
-              signalData: signalData,
+              signal: signalData, // ✅ CORRECT KEY
               from: me,
               name,
             });
@@ -265,7 +260,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         handleRemoteStream
       );
     } catch (error) {
-      console.error('Error calling user:', error);
+      console.error('❌ Error calling user:', error);
       isCalling.current = false;
     }
   };
@@ -276,7 +271,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
   };
 
   const endCallCleanup = () => {
-    console.log('Cleaning up call');
+    console.log('🧹 Cleaning up call');
 
     setCall(null);
     setCallEnded(true);
@@ -284,13 +279,11 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     isCalling.current = false;
     isAnswering.current = false;
 
-    // Clean up remote stream
     if (remoteStream) {
       remoteStream.getTracks().forEach((track) => track.stop());
       setRemoteStream(null);
     }
 
-    // Clean up peer connection
     cleanupPeer();
   };
 
