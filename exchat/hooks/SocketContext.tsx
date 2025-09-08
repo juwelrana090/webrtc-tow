@@ -318,7 +318,7 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
         name,
         setName,
         callEnded,
-        me,
+        me: socket.id,
         users,
         idToCall,
         setIdToCall,

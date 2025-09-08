@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 5050;
 // Active users list
 let users = [];
 
-// Active calls tracking (optional - for better call management)
+// Active calls tracking — maps socketId → { caller, callee, startTime }
 let activeCalls = new Map();
 
 /**
@@ -132,19 +132,22 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Track active call
-    activeCalls.set(socket.id, {
+    // ✅ CRITICAL FIX: Track call under BOTH caller and callee socket IDs
+    const callInfo = {
       caller: socket.id,
       callee: targetUser.socketId,
       startTime: Date.now(),
-    });
+    };
+
+    activeCalls.set(socket.id, callInfo); // Caller → Call info
+    activeCalls.set(targetUser.socketId, callInfo); // Callee → Call info (allows callee to send signals before answering)
 
     console.log(`📞 Forwarding call to socket: ${targetUser.socketId}`);
     logSignal(signalData.type, callerUser.name, targetUser.name);
 
     // Forward the call to target user
     io.to(targetUser.socketId).emit("callUser", {
-      signal: signalData, // ✅ Correct
+      signal: signalData,
       from: from,
       name: name,
     });
@@ -166,6 +169,15 @@ io.on("connection", (socket) => {
 
     if (answererUser && callerUser) {
       logSignal(signal.type, answererUser.name, callerUser.name);
+
+      // ✅ Optional: Reinforce bidirectional mapping (defensive)
+      const callInfo = {
+        caller: to,
+        callee: socket.id,
+        startTime: Date.now(),
+      };
+      activeCalls.set(to, callInfo);
+      activeCalls.set(socket.id, callInfo);
     }
 
     // Forward the answer to the original caller
@@ -187,11 +199,7 @@ io.on("connection", (socket) => {
     let targetSocketId = null;
 
     // Find the other participant in the call
-    const activeCall =
-      activeCalls.get(socket.id) ||
-      Array.from(activeCalls.values()).find(
-        (call) => call.caller === socket.id || call.callee === socket.id
-      );
+    const activeCall = activeCalls.get(socket.id);
 
     if (activeCall) {
       // Determine the target socket ID
@@ -200,7 +208,12 @@ io.on("connection", (socket) => {
     }
 
     if (!targetSocketId) {
-      console.log("❌ No active call found for signal relay");
+      console.log(
+        "❌ No active call found for signal relay (socket.id:",
+        socket.id,
+        ")"
+      );
+      console.log("📊 Active calls map keys:", Array.from(activeCalls.keys()));
       return;
     }
 
@@ -215,7 +228,7 @@ io.on("connection", (socket) => {
   });
 
   /**
-   * Handle ICE candidates (legacy support)
+   * Handle ICE candidates (legacy support — you may not need this if using 'signal' for all)
    */
   socket.on("iceCandidate", ({ candidate, to }) => {
     console.log("🧊 ICE candidate forwarded to:", to);
@@ -242,12 +255,11 @@ io.on("connection", (socket) => {
       console.log(`❌ ${leavingUser.name} left call with ${targetUser.name}`);
     }
 
-    // Clean up active call tracking
-    activeCalls.delete(socket.id);
-    for (let [key, call] of activeCalls.entries()) {
-      if (call.caller === socket.id || call.callee === socket.id) {
-        activeCalls.delete(key);
-      }
+    // ✅ Clean up BOTH entries
+    const activeCall = activeCalls.get(socket.id);
+    if (activeCall) {
+      activeCalls.delete(activeCall.caller);
+      activeCalls.delete(activeCall.callee);
     }
 
     // Notify the other participant
@@ -270,19 +282,12 @@ io.on("connection", (socket) => {
       );
     }
 
-    // Clean up any active calls
-    const activeCall =
-      activeCalls.get(socket.id) ||
-      Array.from(activeCalls.entries()).find(
-        ([_, call]) => call.caller === socket.id || call.callee === socket.id
-      );
+    // ✅ Clean up BOTH sides of any active call
+    const activeCall = activeCalls.get(socket.id);
 
     if (activeCall) {
-      const [callKey, call] = Array.isArray(activeCall)
-        ? activeCall
-        : [socket.id, activeCall];
       const otherParticipant =
-        call.caller === socket.id ? call.callee : call.caller;
+        activeCall.caller === socket.id ? activeCall.callee : activeCall.caller;
 
       console.log(
         "📞 Ending call due to disconnect, notifying:",
@@ -292,9 +297,9 @@ io.on("connection", (socket) => {
       // Notify the other participant
       io.to(otherParticipant).emit("leaveCall");
 
-      // Clean up call tracking
-      activeCalls.delete(callKey);
-      activeCalls.delete(otherParticipant);
+      // ✅ Delete both entries
+      activeCalls.delete(activeCall.caller);
+      activeCalls.delete(activeCall.callee);
     }
 
     console.log(
@@ -317,7 +322,14 @@ io.on("connection", (socket) => {
    * Debug endpoint - Get active calls (optional)
    */
   socket.on("getActiveCalls", () => {
-    socket.emit("activeCalls", Array.from(activeCalls.entries()));
+    const calls = Array.from(activeCalls.entries()).map(([key, val]) => ({
+      key,
+      caller: val.caller,
+      callee: val.callee,
+      startTime: val.startTime,
+    }));
+    console.log("📊 Active Calls Debug:", calls);
+    socket.emit("activeCalls", calls);
   });
 });
 
