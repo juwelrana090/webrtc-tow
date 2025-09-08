@@ -110,8 +110,8 @@ io.on("connection", (socket) => {
     console.log(`📞 Signal type: ${signalData?.type}`);
 
     // Find the target user's socket ID
-    const targetUser = findUserByUserId(userToCall);
-    const callerUser = findUserBySocketId(socket.id);
+    const targetUser = userToCall; // findUserByUserId(userToCall);
+    const callerUser = from; //findUserBySocketId(socket.id);
 
     if (!targetUser) {
       console.log(`❌ Target user ${userToCall} not found`);
@@ -135,18 +135,18 @@ io.on("connection", (socket) => {
     // ✅ CRITICAL FIX: Track call under BOTH caller and callee socket IDs
     const callInfo = {
       caller: socket.id,
-      callee: targetUser.socketId,
+      callee: targetUser,
       startTime: Date.now(),
     };
 
     activeCalls.set(socket.id, callInfo); // Caller → Call info
-    activeCalls.set(targetUser.socketId, callInfo); // Callee → Call info (allows callee to send signals before answering)
+    activeCalls.set(targetUser, callInfo); // Callee → Call info (allows callee to send signals before answering)
 
-    console.log(`📞 Forwarding call to socket: ${targetUser.socketId}`);
-    logSignal(signalData.type, callerUser.name, targetUser.name);
+    console.log(`📞 Forwarding call to socket: ${targetUser}`);
+    logSignal(signalData.type, callerUser.name, name);
 
     // Forward the call to target user
-    io.to(targetUser.socketId).emit("callUser", {
+    io.to(targetUser).emit("callUser", {
       signal: signalData,
       from: from,
       name: name,
@@ -159,8 +159,8 @@ io.on("connection", (socket) => {
   socket.on("answerCall", ({ signal, to }) => {
     console.log("✅ Call answered, forwarding answer to:", to);
 
-    const answererUser = findUserBySocketId(socket.id);
-    const callerUser = findUserBySocketId(to);
+    const answererUser = socket.id; //findUserBySocketId(socket.id);
+    const callerUser = to; //findUserBySocketId(to);
 
     if (!signal || signal.type !== "answer") {
       console.log(`❌ Invalid answer signal:`, signal);
@@ -168,7 +168,7 @@ io.on("connection", (socket) => {
     }
 
     if (answererUser && callerUser) {
-      logSignal(signal.type, answererUser.name, callerUser.name);
+      logSignal(signal.type, answererUser, callerUser);
 
       // ✅ Optional: Reinforce bidirectional mapping (defensive)
       const callInfo = {
@@ -234,7 +234,7 @@ io.on("connection", (socket) => {
     console.log("🧊 ICE candidate forwarded to:", to);
 
     const targetUser = findUserByUserId(to) || findUserBySocketId(to);
-    const targetSocketId = targetUser ? targetUser.socketId : to;
+    const targetSocketId = to;
 
     io.to(targetSocketId).emit("iceCandidate", { candidate });
   });
@@ -249,7 +249,7 @@ io.on("connection", (socket) => {
 
     // Find the target user's socket ID if 'to' is a userId
     const targetUser = findUserByUserId(to) || findUserBySocketId(to);
-    const targetSocketId = targetUser ? targetUser.socketId : to;
+    const targetSocketId = to;
 
     if (leavingUser && targetUser) {
       console.log(`❌ ${leavingUser.name} left call with ${targetUser.name}`);
@@ -263,7 +263,7 @@ io.on("connection", (socket) => {
     }
 
     // Notify the other participant
-    io.to(targetSocketId).emit("leaveCall");
+    io.to(to).emit("leaveCall");
   });
 
   /**
