@@ -1,6 +1,6 @@
 import { SocketContext } from '@/hooks/SocketContext';
 import React, { useContext } from 'react';
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { RTCView } from 'react-native-webrtc';
 
 const VideoPlayer = () => {
@@ -9,24 +9,28 @@ const VideoPlayer = () => {
   if (!socketContext) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-900">
-        <Text className="text-lg text-white">⚠️ Socket context not available.</Text>
+        <Text className="text-lg text-white">Socket context not available.</Text>
       </View>
     );
   }
 
-  const { call, callAccepted, callEnded, localStream, remoteStream, name } = socketContext;
+  const { call, callAccepted, localStream, remoteStream, name, callEnded } = socketContext;
 
-  console.log('🎥 Rendering VideoPlayer component', remoteStream);
+  console.log('Rendering VideoPlayer with call:', call);
+  console.log('Rendering VideoPlayer with callAccepted:', callAccepted);
+  console.log('Rendering VideoPlayer with localStream:', localStream);
+  console.log('Rendering VideoPlayer with remoteStream:', remoteStream);
+  console.log('Rendering VideoPlayer with name:', name);
+  console.log('Rendering VideoPlayer with callEnded:', callEnded);
 
   return (
-    <View className="flex-1 items-center justify-center bg-gray-900">
+    <View className="z-10 flex h-full w-full items-center justify-center bg-gray-900 px-0 py-0">
       <View className="h-full w-full overflow-hidden">
-        {/* ✅ Local Video */}
-        {localStream ? (
+        {/* Remote Video Stream (Main View) */}
+        {callAccepted && !callEnded && remoteStream ? (
           <RTCView
-            streamURL={localStream.toURL?.()}
+            streamURL={remoteStream.toURL()}
             style={{ width: '100%', height: '100%' }}
-            mirror
             objectFit="cover"
           />
         ) : (
@@ -36,40 +40,41 @@ const VideoPlayer = () => {
                 {name ? name.charAt(0).toUpperCase() : 'U'}
               </Text>
             </View>
-            <Text className="mt-4 text-white">Waiting for your video...</Text>
+            <Text className="mt-4 text-white">
+              {call ? `Incoming call from ${call.name}` : 'Waiting for connection...'}
+            </Text>
           </View>
         )}
 
-        {/* ✅ Remote Video (PiP) */}
-        {callAccepted && !callEnded && (
+        {/* Local Video Stream (Picture-in-Picture) */}
+        {localStream && (
           <View className="absolute right-2 top-2 h-48 w-32 overflow-hidden rounded-lg border-2 border-white bg-gray-700">
-            {remoteStream ? (
-              <RTCView
-                streamURL={remoteStream.toURL?.()}
-                style={{ width: '100%', height: '100%' }}
-                mirror={false}
-                objectFit="cover"
-              />
-            ) : (
-              <View className="flex-1 items-center justify-center bg-gray-800">
-                <View className="animate-pulse">
-                  <View className="mb-2 h-10 w-10 rounded-full bg-blue-500" />
-                  <Text className="text-xs text-white">Connecting...</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Remote User Label */}
+            <RTCView
+              streamURL={localStream.toURL()}
+              style={{ width: '100%', height: '100%' }}
+              mirror={true}
+              objectFit="cover"
+            />
             <View className="absolute bottom-2 left-2 rounded bg-black bg-opacity-50 px-2 py-1">
-              <Text className="text-xs text-white">{call?.name || 'Remote User'}</Text>
+              <Text className="text-xs text-white">You</Text>
             </View>
           </View>
         )}
 
-        {/* ✅ Local User Label */}
-        <View className="absolute left-4 top-8 rounded-full bg-black bg-opacity-50 px-3 py-2">
-          <Text className="text-sm text-white">You</Text>
-        </View>
+        {/* Connecting Indicator */}
+        {callAccepted && !callEnded && !remoteStream && (
+          <View className="absolute inset-0 items-center justify-center bg-black bg-opacity-70">
+            <ActivityIndicator size="large" color="#ffffff" />
+            <Text className="mt-4 text-white">Connecting...</Text>
+          </View>
+        )}
+
+        {/* Incoming Call Indicator */}
+        {call && !callAccepted && (
+          <View className="absolute inset-0 items-center justify-center bg-black bg-opacity-70">
+            <Text className="text-xl text-white">Incoming call from {call.name}</Text>
+          </View>
+        )}
       </View>
     </View>
   );

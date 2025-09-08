@@ -9,7 +9,7 @@ const UserCard = ({ name, socketId, userId }: UserProps) => {
   const router = useRouter();
 
   const handleSelect = async () => {
-    await AsyncStorage.setItem('chatUser', JSON.stringify({ name, userId }));
+    await AsyncStorage.setItem('chatUser', JSON.stringify({ name, userId, socketId }));
     router.push(`/chats/${userId}`);
   };
 
