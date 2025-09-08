@@ -15,7 +15,7 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 
 let users = [];
 let peerMap = new Map(); // socket.id → peer socket.id
