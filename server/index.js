@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // 🔐 Change in production
+    origin: "*", // 🔐 Change this to your frontend origin in production
     methods: ["GET", "POST"],
   },
 });
@@ -20,18 +20,24 @@ const PORT = process.env.PORT || 5000;
 // Active users list
 let users = [];
 
-// ✅ SIMPLE PEER MAPPING: socket.id → target socket.id
-let peerMap = new Map();
-
 /**
  * REST Endpoints
  */
+// ✅ Health check
 app.get("/", (req, res) => {
-  res.status(200).send({ status: "success", message: "Server is running" });
+  res.status(200).send({
+    status: "success",
+    message: "Server is running",
+  });
 });
 
+// ✅ Get all users
 app.get("/get", (req, res) => {
-  res.status(200).send({ status: "success", message: "Users fetched", users });
+  res.status(200).send({
+    status: "success",
+    message: "Users fetched successfully",
+    users,
+  });
 });
 
 /**
@@ -39,6 +45,8 @@ app.get("/get", (req, res) => {
  */
 io.on("connection", (socket) => {
   console.log("✅ User connected:", socket.id);
+
+  // Send socket ID to client
   socket.emit("me", socket.id);
 
   /**
@@ -47,119 +55,111 @@ io.on("connection", (socket) => {
   socket.on("registerUser", ({ name, userId }) => {
     if (!userId || !name) return;
 
+    console.log("👤 Registering user:", { name, userId, socketId: socket.id });
+
+    // Remove old user with same ID (prevent duplicates)
     users = users.filter((user) => user.userId !== userId);
+
+    // Add new user
     const newUser = { name, userId, socketId: socket.id };
     users.push(newUser);
 
-    console.log("👤 Registered:", name, "(", userId, ")");
+    console.log("📤 Updated user list:", users);
+
+    // Broadcast updated list to all clients
     io.emit("userList", users);
   });
 
   /**
-   * Get users (optional)
+   * Request user list
    */
   socket.on("getUsers", () => {
+    console.log("📤 Sending user list to:", socket.id);
     socket.emit("userList", users);
   });
 
   /**
-   * Call user → offer sent
+   * Call user
    */
-  socket.on("callUser", ({ userToCall, signal, from, name }) => {
-    console.log(`📞 ${name} (${from}) calling ${userToCall}`);
+  socket.on("callUser", ({ userToCall, signalData, from, name }) => {
+    console.log(`📞 Call initiated: ${name} (${from}) → ${userToCall}`);
 
-    const targetUser = users.find((u) => u.userId === userToCall);
-    if (!targetUser) {
+    // Find the target user's socket ID
+    const targetUser = users.find((user) => user.userId === userToCall);
+
+    if (targetUser) {
+      console.log(`📞 Forwarding call to socket: ${targetUser.socketId}`);
+      io.to(targetUser.socketId).emit("callUser", {
+        signal: signalData,
+        from: from,
+        name: name,
+      });
+    } else {
       console.log(`❌ User ${userToCall} not found`);
+      // Optionally emit an error back to caller
       socket.emit("callError", { message: "User not found" });
-      return;
     }
-
-    // ✅ SIMPLE: Caller remembers who they called
-    peerMap.set(socket.id, targetUser.socketId);
-
-    // Forward offer to target
-    io.to(targetUser.socketId).emit("callUser", {
-      signal,
-      from,
-      name,
-    });
   });
 
   /**
-   * Answer call → answer sent back
+   * Answer call
    */
   socket.on("answerCall", ({ signal, to }) => {
-    console.log("✅ Answering call to:", to);
-
-    const targetSocketId = users.find((u) => u.userId === to)?.socketId || to;
-
-    // ✅ SIMPLE: Callee remembers who they’re answering
-    peerMap.set(socket.id, targetSocketId);
-
-    // Send answer back to caller
-    io.to(targetSocketId).emit("callAccepted", { signal });
+    console.log("✅ Call answered, forwarding to:", to);
+    io.to(to).emit("callAccepted", signal);
   });
 
   /**
-   * Handle all signals (offer/answer/candidate)
-   */
-  socket.on("signal", ({ signal }) => {
-    if (!signal) return;
-
-    console.log(`📡 Signal from ${socket.id}:`, signal.type);
-
-    // ✅ Forward to whoever this socket last interacted with
-    const targetSocketId = peerMap.get(socket.id);
-    if (!targetSocketId) {
-      console.log(`❌ No peer found for ${socket.id} — can’t forward signal`);
-      return;
-    }
-
-    io.to(targetSocketId).emit("signal", { signal });
-  });
-
-  /**
-   * Handle ICE candidate (optional — if you still use this event)
+   * Handle ICE candidates
    */
   socket.on("iceCandidate", ({ candidate, to }) => {
-    console.log("🧊 Forwarding ICE candidate to:", to);
-    const targetSocketId = users.find((u) => u.userId === to)?.socketId || to;
-    io.to(targetSocketId).emit("iceCandidate", { candidate });
+    console.log("🧊 ICE candidate forwarded to:", to);
+    io.to(to).emit("iceCandidate", { candidate });
   });
 
   /**
    * Leave call
    */
   socket.on("leaveCall", ({ to }) => {
-    console.log(`❌ ${socket.id} leaving call with ${to}`);
+    console.log("❌ Call ended, notifying:", to);
 
-    const targetSocketId = users.find((u) => u.userId === to)?.socketId || to;
+    // Find the target user's socket ID if 'to' is a userId
+    const targetUser = users.find((user) => user.userId === to);
+    const targetSocketId = targetUser ? targetUser.socketId : to;
+
     io.to(targetSocketId).emit("leaveCall");
-
-    // Optional: Clean up peerMap
-    peerMap.delete(socket.id);
-    peerMap.delete(targetSocketId);
   });
 
   /**
-   * Disconnect
+   * Handle disconnect
    */
   socket.on("disconnect", () => {
-    console.log("🚪", socket.id, "disconnected");
+    console.log("🚪 User disconnected:", socket.id);
 
+    // Find and remove user by socketId
+    const disconnectedUser = users.find((user) => user.socketId === socket.id);
     users = users.filter((user) => user.socketId !== socket.id);
+
+    console.log("📤 Updated user list after disconnect:", users);
+
+    // Broadcast updated list
     io.emit("userList", users);
 
-    // Clean up peerMap
-    peerMap.delete(socket.id);
+    // Notify others that call ended (if they were in a call)
+    socket.broadcast.emit("callEnded");
   });
 
+  /**
+   * Handle connection errors
+   */
   socket.on("error", (error) => {
     console.error("❌ Socket error:", error);
   });
 });
 
+/**
+ * Start server
+ */
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`🌐 Socket.IO server ready`);

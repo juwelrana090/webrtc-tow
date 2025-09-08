@@ -77,7 +77,11 @@ const ContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) 
     init();
 
     // Socket event listeners
-    socket.on('me', (id: string) => setMe(id));
+    socket.on('me', (id: string) => {
+      console.log('👤 Me:', id);
+      setMe(id);
+    });
+
     socket.on('userList', (users: { name: string; userId: string }[]) => setUsers(users));
 
     socket.on('callUser', async (data: { from: string; name: string; signal: SignalData }) => {
