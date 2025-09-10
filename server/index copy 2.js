@@ -137,34 +137,29 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Handle ICE candidates with better error handling and queuing
+  // Handle ICE candidates
   socket.on("ice-candidate", (data) => {
     const { roomId, candidate, targetSocketId } = data;
     const userInfo = userSockets.get(socket.id);
 
     if (userInfo && userInfo.roomId === roomId) {
-      // Validate candidate data
-      if (!candidate || !candidate.candidate) {
-        console.warn("⚠️ Invalid ICE candidate received");
-        return;
-      }
-
-      const candidateInfo = {
-        candidate,
-        senderSocketId: socket.id,
-        senderId: userInfo.userId,
-        timestamp: Date.now(),
-      };
-
       if (targetSocketId) {
-        // Send to specific user with acknowledgment
-        socket.to(targetSocketId).emit("ice-candidate", candidateInfo);
-        console.log(`🧊 ICE candidate sent to specific user in room ${roomId}`);
+        // Send to specific user
+        socket.to(targetSocketId).emit("ice-candidate", {
+          candidate,
+          senderSocketId: socket.id,
+          senderId: userInfo.userId,
+        });
       } else {
         // Broadcast to all users in room except sender
-        socket.to(roomId).emit("ice-candidate", candidateInfo);
-        console.log(`🧊 ICE candidate broadcast in room ${roomId}`);
+        socket.to(roomId).emit("ice-candidate", {
+          candidate,
+          senderSocketId: socket.id,
+          senderId: userInfo.userId,
+        });
       }
+
+      console.log(`🧊 ICE candidate relayed in room ${roomId}`);
     }
   });
 

@@ -442,15 +442,6 @@ export default function Index() {
       <Text className="text-xs text-white">
         Call State: {gettingCall ? 'Getting' : callAccepted ? 'Accepted' : 'Idle'}
       </Text>
-      {remoteStream && (
-        <Text className="text-xs text-white">
-          Remote Tracks:{' '}
-          {remoteStream
-            .getTracks()
-            .map((t) => `${t.kind}(${t.readyState})`)
-            .join(', ')}
-        </Text>
-      )}
     </View>
   );
 

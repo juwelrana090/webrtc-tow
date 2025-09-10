@@ -19,7 +19,12 @@ class Utils {
     }
 
     const stream = await mediaDevices.getUserMedia({
-      audio: true,
+      audio: {
+        //@ts-ignore
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
       video: {
         width: 640,
         height: 480,
