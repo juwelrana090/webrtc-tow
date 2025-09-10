@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "430397943780",
+    "project_id": "qawiun-fcm",
+    "storage_bucket": "qawiun-fcm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:430397943780:android:6da28bf1b281cf4f69e1f1",
+        "android_client_info": {
+          "package_name": "com.webrtcchat.calling"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDc_icacW3W83ynD_zooI0XiA20cXOst-I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

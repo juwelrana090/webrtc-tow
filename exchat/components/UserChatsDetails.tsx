@@ -12,7 +12,7 @@ import {
 import VideoPlayer from './VideoPlayer';
 
 interface Props {
-  id: string; // ← Should be TARGET USER'S userId (e.g., "user123")
+  id: string;
   router: any;
 }
 
@@ -24,7 +24,7 @@ const UserChatsDetails = ({ id, router }: Props) => {
     name: myName,
     setName,
     callEnded,
-    me, // ← My socket ID — must be set before calling
+    me,
     idToCall,
     answerCall,
     callUser,
@@ -134,13 +134,9 @@ const UserChatsDetails = ({ id, router }: Props) => {
           {/* Call Button */}
           <TouchableOpacity
             onPress={() => callUser(id)}
-            disabled={!me || !stream} // ← CRITICAL: Wait for socket + stream
+            disabled={!stream} // ← CRITICAL: Wait for socket + stream
             className={`h-14 w-14 items-center justify-center rounded-full ${
-              !me || !stream
-                ? 'bg-gray-500'
-                : callAccepted && !callEnded
-                  ? 'bg-red-600'
-                  : 'bg-green-600'
+              !stream ? 'bg-gray-500' : callAccepted && !callEnded ? 'bg-red-600' : 'bg-green-600'
             }`}>
             <Text className="text-xl font-bold text-white">📞</Text>
           </TouchableOpacity>

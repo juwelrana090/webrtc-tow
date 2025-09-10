@@ -23,11 +23,40 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.webrtcchat.calling",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "CHANGE_NETWORK_STATE",
+        "MODIFY_AUDIO_SETTINGS",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CHANGE_NETWORK_STATE",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
+      "minSdkVersion": 24,
+      "kotlinVersion": "1.9.22",
+      "compileOptions": {
+        "sourceCompatibility": "1.8",
+        "targetCompatibility": "1.8"
+      },
+      "gradleProperties": {
+        "android.enableDexingArtifactTransform.desugaring": "false"
+      },
+      "extraGradlePlugins": [
+        {
+          "id": "com.google.gms.google-services",
+          "version": "4.4.3"
+        }
+      ],
+      "dependencies": [
+        "implementation platform('com.google.firebase:firebase-bom:34.2.0')",
+        "implementation 'com.google.firebase:firebase-analytics'"
       ]
     },
     "web": {

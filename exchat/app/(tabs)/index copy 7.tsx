@@ -1,8 +1,10 @@
 import Button from '@/components/Button';
 import GettingCall from '@/components/GettingCall';
 import Video from '@/components/Video';
+import '@/config/firebase';
 import { ContextProvider } from '@/hooks/SocketContext';
 import Utils from '@/hooks/Utils';
+import firestore, { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, SafeAreaView, Text, View } from 'react-native';
 import {
@@ -11,11 +13,6 @@ import {
   RTCPeerConnection,
   RTCSessionDescription,
 } from 'react-native-webrtc';
-import io from 'socket.io-client';
-
-// Replace with your server URL
-const SERVER_URL = 'https://rtcback.madrasah.dev'; // Change this to your backend URL
-const ROOM_ID = 'default-room'; // You can make this dynamic
 
 const configuration: RTCConfiguration = {
   iceServers: [
@@ -64,142 +61,46 @@ export default function Index() {
   const [callAccepted, setCallAccepted] = useState(false);
   const [connectionState, setConnectionState] = useState('new');
   const [iceConnectionState, setIceConnectionState] = useState('new');
-  const [socketConnected, setSocketConnected] = useState(false);
 
   const pc = useRef<RTCPeerConnection | null>(null);
-  const socket = useRef<any>(null);
   const connecting = useRef(false);
-  const userId = useRef(`user_${Math.random().toString(36).substr(2, 9)}`);
-  const callerSocketId = useRef<string | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const candidatesUnsubscribeRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    // Initialize socket connection
-    initializeSocket();
+    const cRef = firestore().collection('meet').doc('chatId');
+
+    // Listens for data changes in the document
+    const subscribe = cRef.onSnapshot((snapshot) => {
+      const data = snapshot.data();
+      console.log('📄 Snapshot data: ', data ? 'Has data' : 'No data');
+
+      // On answer start the call
+      if (pc.current && !pc.current.remoteDescription && data && data.answer) {
+        console.log('📥 Setting remote description with answer');
+        pc.current
+          .setRemoteDescription(new RTCSessionDescription(data.answer))
+          .then(() => {
+            console.log('✅ Remote description set successfully');
+            setCallAccepted(true);
+          })
+          .catch((err) => console.error('❌ Error setting remote description:', err));
+      }
+
+      // If there is offer for chatId, set getting call state
+      if (data && data.offer && !connecting.current) {
+        console.log('📞 Incoming call detected');
+        setGettingCall(true);
+      }
+    });
+
+    unsubscribeRef.current = subscribe;
 
     return () => {
-      cleanupSocket();
+      if (unsubscribeRef.current) unsubscribeRef.current();
+      if (candidatesUnsubscribeRef.current) candidatesUnsubscribeRef.current();
     };
   }, []);
-
-  const initializeSocket = () => {
-    console.log('🔌 Connecting to Socket.IO server...');
-
-    socket.current = io(SERVER_URL, {
-      transports: ['websocket', 'polling'],
-      timeout: 10000,
-      forceNew: true,
-    });
-
-    // Socket connection events
-    socket.current.on('connect', () => {
-      console.log('✅ Connected to Socket.IO server:', socket.current.id);
-      setSocketConnected(true);
-
-      // Join the room
-      socket.current.emit('join-room', {
-        roomId: ROOM_ID,
-        userId: userId.current,
-      });
-    });
-
-    socket.current.on('disconnect', (reason: string) => {
-      console.log('❌ Disconnected from Socket.IO server:', reason);
-      setSocketConnected(false);
-    });
-
-    socket.current.on('connect_error', (error: any) => {
-      console.error('🔌 Socket connection error:', error);
-      setSocketConnected(false);
-    });
-
-    // Room events
-    socket.current.on('room-joined', (data: any) => {
-      console.log('🏠 Joined room:', data);
-    });
-
-    socket.current.on('user-joined', (data: any) => {
-      console.log('👤 User joined room:', data);
-    });
-
-    socket.current.on('user-left', (data: any) => {
-      console.log('👋 User left room:', data);
-    });
-
-    // Call events
-    socket.current.on('incoming-call', async (data: any) => {
-      console.log('📞 Incoming call from:', data.callerId);
-
-      if (!connecting.current) {
-        callerSocketId.current = data.callerSocketId;
-        setGettingCall(true);
-
-        // Setup WebRTC for receiving call
-        const setupSuccess = await setupWebrtc();
-        if (setupSuccess && pc.current) {
-          try {
-            // Set remote description with the offer
-            await pc.current.setRemoteDescription(new RTCSessionDescription(data.offer));
-            console.log('📥 Remote description set with offer');
-          } catch (error) {
-            console.error('❌ Error setting remote description:', error);
-          }
-        }
-      }
-    });
-
-    socket.current.on('call-answered', async (data: any) => {
-      console.log('📞 Call answered by:', data.answererId);
-
-      if (pc.current && !pc.current.remoteDescription) {
-        try {
-          await pc.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-          console.log('✅ Remote description set with answer');
-          setCallAccepted(true);
-        } catch (error) {
-          console.error('❌ Error setting remote description:', error);
-        }
-      }
-    });
-
-    socket.current.on('call-rejected', (data: any) => {
-      console.log('❌ Call rejected by:', data.rejectedBy);
-      Alert.alert('Call Rejected', 'The call was rejected by the other user');
-      hangup();
-    });
-
-    socket.current.on('call-ended', (data: any) => {
-      console.log('📴 Call ended by:', data.endedBy);
-      hangup();
-    });
-
-    socket.current.on('call-connected', (data: any) => {
-      console.log('🎉 Call connected:', data);
-      setCallAccepted(true);
-    });
-
-    // ICE candidate events
-    socket.current.on('ice-candidate', async (data: any) => {
-      console.log('🧊 Received ICE candidate from:', data.senderId);
-
-      if (pc.current && data.candidate) {
-        try {
-          const candidate = new RTCIceCandidate(data.candidate);
-          await pc.current.addIceCandidate(candidate);
-          console.log('✅ ICE candidate added');
-        } catch (error) {
-          console.error('❌ Error adding ICE candidate:', error);
-        }
-      }
-    });
-  };
-
-  const cleanupSocket = () => {
-    if (socket.current) {
-      socket.current.disconnect();
-      socket.current = null;
-    }
-    setSocketConnected(false);
-  };
 
   const setupWebrtc = async (): Promise<boolean> => {
     try {
@@ -222,7 +123,7 @@ export default function Index() {
         return false;
       }
 
-      // Handle remote stream
+      // Handle remote stream using ontrack
       pc.current.ontrack = (event) => {
         console.log(
           '🎯 Received remote track:',
@@ -239,6 +140,7 @@ export default function Index() {
           );
           setRemoteStream(stream);
 
+          // Log track details
           stream.getTracks().forEach((track) => {
             console.log(`Track ${track.kind}:`, {
               id: track.id,
@@ -267,22 +169,6 @@ export default function Index() {
         setIceConnectionState(state);
       };
 
-      // Handle ICE candidates
-      pc.current.onicecandidate = (event) => {
-        if (event.candidate && socket.current) {
-          console.log('🧊 Sending ICE candidate');
-          socket.current.emit('ice-candidate', {
-            roomId: ROOM_ID,
-            candidate: {
-              candidate: event.candidate.candidate,
-              sdpMLineIndex: event.candidate.sdpMLineIndex,
-              sdpMid: event.candidate.sdpMid,
-            },
-            targetSocketId: callerSocketId.current, // Send to specific peer if known
-          });
-        }
-      };
-
       return true;
     } catch (error) {
       console.error('❌ Error setting up WebRTC:', error);
@@ -293,19 +179,27 @@ export default function Index() {
 
   const create = async () => {
     try {
-      if (!socketConnected) {
-        Alert.alert('Error', 'Not connected to server');
-        return;
-      }
-
       console.log('📞 Creating call...');
       const setupSuccess = await setupWebrtc();
       if (!setupSuccess) return;
 
       connecting.current = true;
 
+      const cRef = firestore().collection('meet').doc('chatId');
+
+      // Clean existing call data
+      try {
+        await cRef.delete();
+        console.log('🧹 Cleaned existing call data');
+      } catch (e) {
+        // Document might not exist, that's fine
+      }
+
+      // Set up ICE candidate collection
+      collectIceCandidates(cRef, 'caller', 'callee');
+
+      // Create offer
       if (pc.current) {
-        // Create offer
         const offer = await pc.current.createOffer({
           offerToReceiveAudio: true,
           offerToReceiveVideo: true,
@@ -314,16 +208,15 @@ export default function Index() {
         console.log('📋 Created offer');
         await pc.current.setLocalDescription(offer);
 
-        // Send offer through socket
-        socket.current.emit('create-offer', {
-          roomId: ROOM_ID,
+        await cRef.set({
           offer: {
             type: offer.type,
             sdp: offer.sdp,
           },
+          createdAt: firestore.FieldValue.serverTimestamp(),
+          status: 'waiting',
         });
-
-        console.log('📤 Offer sent via Socket.IO');
+        console.log('💾 Offer saved to Firestore');
       }
     } catch (err) {
       console.error('❌ Error creating call:', err);
@@ -333,17 +226,27 @@ export default function Index() {
 
   const join = async () => {
     try {
-      if (!socketConnected) {
-        Alert.alert('Error', 'Not connected to server');
-        return;
-      }
-
       console.log('🤝 Joining call...');
       connecting.current = true;
       setGettingCall(false);
 
-      if (pc.current && pc.current.remoteDescription) {
-        try {
+      const cRef = firestore().collection('meet').doc('chatId');
+      const callData = (await cRef.get()).data();
+      const offer = callData?.offer;
+      console.log('📥 Got offer data:', offer ? 'Present' : 'Missing');
+
+      if (offer) {
+        const setupSuccess = await setupWebrtc();
+        if (!setupSuccess) return;
+
+        // Set up ICE candidate collection (reversed for callee)
+        collectIceCandidates(cRef, 'callee', 'caller');
+
+        if (pc.current) {
+          // Set remote description with the offer
+          console.log('📤 Setting remote description with offer');
+          await pc.current.setRemoteDescription(new RTCSessionDescription(offer));
+
           // Create answer
           const answer = await pc.current.createAnswer({
             offerToReceiveAudio: true,
@@ -353,59 +256,31 @@ export default function Index() {
           console.log('📋 Created answer');
           await pc.current.setLocalDescription(answer);
 
-          // Send answer through socket
-          socket.current.emit('answer-call', {
-            roomId: ROOM_ID,
+          // Save answer to Firestore
+          await cRef.update({
             answer: {
               type: answer.type,
               sdp: answer.sdp,
             },
-            callerSocketId: callerSocketId.current,
+            status: 'connected',
           });
-
-          console.log('📤 Answer sent via Socket.IO');
-          setCallAccepted(true);
-        } catch (error) {
-          console.error('❌ Error creating/sending answer:', error);
-          Alert.alert('Error', 'Failed to answer call');
+          console.log('💾 Answer saved to Firestore');
         }
       }
+
+      setCallAccepted(true);
     } catch (err) {
       console.error('❌ Error joining call:', err);
       Alert.alert('Error', 'Failed to join call');
     }
   };
 
-  const reject = () => {
-    console.log('❌ Rejecting call');
-
-    if (socket.current && callerSocketId.current) {
-      socket.current.emit('reject-call', {
-        roomId: ROOM_ID,
-        callerSocketId: callerSocketId.current,
-      });
-    }
-
-    setGettingCall(false);
-    callerSocketId.current = null;
-    connecting.current = false;
-  };
-
   const hangup = async () => {
     try {
       console.log('📴 Hanging up call...');
-
-      // Notify other users
-      if (socket.current && connecting.current) {
-        socket.current.emit('hangup-call', {
-          roomId: ROOM_ID,
-        });
-      }
-
       connecting.current = false;
       setCallAccepted(false);
       setGettingCall(false);
-      callerSocketId.current = null;
 
       // Clean up streams
       if (localStream) {
@@ -421,20 +296,97 @@ export default function Index() {
         pc.current = null;
       }
 
-      console.log('🧹 Cleanup completed');
+      // Clean up Firestore
+      const cRef = firestore().collection('meet').doc('chatId');
+      try {
+        const [callerCandidates, calleeCandidates] = await Promise.all([
+          cRef.collection('caller').get(),
+          cRef.collection('callee').get(),
+        ]);
+
+        const deletePromises = [
+          ...callerCandidates.docs.map((doc) => doc.ref.delete()),
+          ...calleeCandidates.docs.map((doc) => doc.ref.delete()),
+        ];
+
+        await Promise.all(deletePromises);
+        await cRef.delete();
+        console.log('🧹 Firestore cleanup completed');
+      } catch (error) {
+        console.warn('⚠️  Cleanup warning:', error);
+      }
     } catch (err) {
       console.error('❌ Error hanging up call:', err);
     }
   };
 
+  const collectIceCandidates = (
+    cRef: FirebaseFirestoreTypes.DocumentReference<FirebaseFirestoreTypes.DocumentData>,
+    localName: string,
+    remoteName: string
+  ) => {
+    const candidatesCollection = cRef.collection(localName);
+
+    if (pc.current) {
+      // Handle local ICE candidates
+      pc.current.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log('🧊 Adding local ICE candidate');
+
+          // Create clean candidate data (avoid undefined values)
+          const candidateData = {
+            candidate: event.candidate.candidate,
+            sdpMLineIndex: event.candidate.sdpMLineIndex,
+            sdpMid: event.candidate.sdpMid,
+            timestamp: firestore.FieldValue.serverTimestamp(),
+          };
+
+          candidatesCollection
+            .add(candidateData)
+            .then(() => console.log('✅ ICE candidate saved'))
+            .catch((err) => console.error('❌ Error saving ICE candidate:', err));
+        }
+      };
+    }
+
+    // Listen for remote ICE candidates
+    const unsubscribe = cRef.collection(remoteName).onSnapshot(
+      (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const candidateData = change.doc.data();
+            const candidate = new RTCIceCandidate({
+              candidate: candidateData.candidate,
+              sdpMLineIndex: candidateData.sdpMLineIndex,
+              sdpMid: candidateData.sdpMid,
+            });
+
+            console.log('🧊 Adding remote ICE candidate');
+            pc.current
+              ?.addIceCandidate(candidate)
+              .then(() => console.log('✅ Remote ICE candidate added'))
+              .catch((err) => console.error('❌ Error adding remote ICE candidate:', err));
+          }
+        });
+      },
+      (error) => {
+        console.error('❌ ICE candidates listener error:', error);
+      }
+    );
+
+    // Store unsubscribe function
+    const prevUnsubscribe = candidatesUnsubscribeRef.current;
+    candidatesUnsubscribeRef.current = () => {
+      unsubscribe();
+      if (prevUnsubscribe) prevUnsubscribe();
+    };
+  };
+
   // Debug component
   const DebugInfo = () => (
-    <View className="absolute left-4 top-10 z-10 rounded bg-black/80 p-2">
+    <View className="absolute left-4 top-10 rounded bg-black/80 p-2">
       <Text className="text-xs text-white">
-        Socket: {socketConnected ? '✅' : '❌'} | Connection: {connectionState}
-      </Text>
-      <Text className="text-xs text-white">
-        ICE: {iceConnectionState} | User: {userId.current}
+        Connection: {connectionState} | ICE: {iceConnectionState}
       </Text>
       <Text className="text-xs text-white">
         Local: {localStream ? '✅' : '❌'} | Remote: {remoteStream ? '✅' : '❌'}
@@ -451,7 +403,7 @@ export default function Index() {
       <ContextProvider>
         <SafeAreaView className="flex-1 bg-black">
           <DebugInfo />
-          <GettingCall hangup={reject} join={join} className="flex-1" />
+          <GettingCall hangup={hangup} join={join} className="flex-1" />
         </SafeAreaView>
       </ContextProvider>
     );
@@ -478,19 +430,8 @@ export default function Index() {
       <SafeAreaView className="flex-1 bg-black">
         <DebugInfo />
         <View className="absolute bottom-32 w-full flex-row justify-center gap-8">
-          <Button
-            onPress={create}
-            iconName="videocam"
-            className={`${socketConnected ? 'bg-green-600' : 'bg-gray-700'}`}
-            disabled={!socketConnected}
-          />
+          <Button onPress={create} iconName="videocam" className="bg-gray-700" />
         </View>
-
-        {!socketConnected && (
-          <View className="absolute bottom-20 w-full">
-            <Text className="text-center text-sm text-white">Connecting to server...</Text>
-          </View>
-        )}
       </SafeAreaView>
     </ContextProvider>
   );
